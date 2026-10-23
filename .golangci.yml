@@ -1,0 +1,29 @@
+version: "2"
+run:
+  timeout: 5m
+linters:
+  enable:
+    - misspell
+    - revive
+    - bodyclose
+    - errorlint
+    - gosec
+  settings:
+    revive:
+      rules:
+        - name: package-comments
+        - name: unused-parameter
+        - name: error-return
+        - name: error-naming
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: indent-error-flow
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [gosec]
+formatters:
+  enable:
+    - gofmt
+    - goimports
