@@ -232,7 +232,6 @@ func TestEKSClusterToNodeGroupsToNodes(t *testing.T) {
 }
 
 func TestSwitchingProfilesChangesTheWholeApp(t *testing.T) {
-	t.Skip("TODO: fails when driven through the real demo (profile row selection/navigation); the same flow passes in ui/profiles_test.go and aws/demo_test.go. Debug and re-enable.")
 	m := demo(t)
 	m = press(m, "p")
 	mustContain(t, m, "Profiles[3]", "acme-prod", "acme-staging", "sandbox", "●", "SSO", "access keys", "123456789012 AdministratorAccess")
@@ -240,9 +239,9 @@ func TestSwitchingProfilesChangesTheWholeApp(t *testing.T) {
 	mustContain(t, m, "Access: profile sandbox · access keys", "Region: us-west-2", "playground")
 	mustNotContain(t, m, "bastion-01")
 	m = press(m, "4")
-	mustContain(t, m, "No auto scaling groups found!") // the sandbox account is tiny: the empty state
-	m = press(m, "p", "enter")                         // back to acme-prod (first row)
-	mustContain(t, m, "Access: profile acme-prod · SSO", "bastion-01")
+	mustContain(t, m, "No auto scaling groups found!")                   // the sandbox account is tiny: the empty state
+	m = press(m, "p", "k", "k", "enter")                                 // the cursor rests on the active profile (sandbox); two up is acme-prod
+	mustContain(t, m, "Access: profile acme-prod · SSO", "web-prod-asg") // back on the screen we came from, now for acme-prod
 }
 
 func TestUnknownDemoProfileStartsSignedOutAndRecovers(t *testing.T) {

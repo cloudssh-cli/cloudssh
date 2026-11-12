@@ -305,3 +305,15 @@ func TestProfileStatesFitTheScreen(t *testing.T) {
 		}
 	}
 }
+
+func TestOpeningProfilesRestsTheCursorOnTheActiveOne(t *testing.T) {
+	f := &fakeAuthn{profile: "prod", access: "profile prod · SSO", profiles: twoProfs}
+	m := signIn(t, f, &recorder{})
+	m, cmd := send(m, key("p"))
+	m = settle(m, cmd)
+	m, cmd = send(m, key("enter")) // enter right away: the active profile, so no re-login
+	m = settle(m, cmd)
+	if len(f.used) != 0 || m.mode != 1 {
+		t.Fatalf("enter on the resting cursor must just go back: used=%v mode=%d", f.used, m.mode)
+	}
+}

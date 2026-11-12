@@ -126,6 +126,7 @@ func New(cfg config.Config, p provider.Provider) Model {
 		// Start on the profiles screen: say what is missing and offer the way forward.
 		m.prevMode, m.mode = m.mode, m.profilesMode()
 		m.stacks[m.mode] = []*screen{m.newScreen(&profilesResource{auth: m.auth}, nil)}
+		m.stacks[m.mode][0].focusActive = true
 	} else if m.mode > 0 {
 		m.stacks[m.mode] = []*screen{m.newScreen(m.resources[m.mode-1], nil)}
 	}
@@ -270,7 +271,9 @@ func (m *Model) showProfiles() tea.Cmd {
 		m.stacks[m.mode] = []*screen{m.newScreen(&profilesResource{auth: m.auth}, nil)}
 	}
 	m.layout()
-	return m.cur().reload() // pick up profiles added since the last visit
+	s := m.cur()
+	s.focusActive = true
+	return s.reload() // pick up profiles added since the last visit
 }
 
 // leaveProfiles returns to the screen the user came from.
@@ -347,6 +350,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.refreshView()
 		if isProfiles(s) {
 			m.hasProfiles = len(s.rows) > 0
+			if s.focusActive {
+				s.focusActive = false
+				for i, r := range s.view {
+					if len(r.Cells) > 0 && r.Cells[0] == "●" {
+						s.tbl.cursor = i
+						s.tbl.ensureVisible()
+						break
+					}
+				}
+			}
 			return m, nil
 		}
 		if m.cur() != s {
@@ -378,6 +391,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmds := []tea.Cmd{m.openMode(back), m.setStatus("Signed in: " + m.auth.Access())}
 		if s := m.stacks[m.profilesMode()]; len(s) > 0 {
+			s[0].focusActive = true
 			cmds = append(cmds, s[0].reload()) // refresh the ● marker for next time
 		}
 		return m, tea.Batch(cmds...)

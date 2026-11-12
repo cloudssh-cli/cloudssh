@@ -25,6 +25,9 @@ type screen struct {
 	loading    bool
 	gen        int // bumped on reload so late responses are dropped
 	sortKeys   []string
+	// focusActive puts the cursor on the active row the next time rows arrive
+	// (the profiles screen: opening it should rest on the profile in use).
+	focusActive bool
 }
 
 func newScreen(id int, res provider.Resource, filters []provider.Filter, w, h int) *screen {
