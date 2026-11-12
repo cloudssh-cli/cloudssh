@@ -21,12 +21,15 @@ type helpEntry struct{ key, desc string }
 type helpSection struct {
 	title   string
 	entries []helpEntry
+	// oneLine lists every entry on its own line (Views); otherwise entries
+	// flow as compact "key label" chips, wrapped at item boundaries.
+	oneLine bool
 }
 
 // helpModal lists every key binding, including the per-column sort keys of
 // the screen it was opened from. Sections flow into as many columns as the
 // terminal is wide; anything that still does not fit scrolls (↑↓ j k pgup
-// pgdn g G home end) and long descriptions wrap instead of being cut off.
+// pgdn g G home end).
 type helpModal struct {
 	sections []helpSection
 	offset   int
@@ -34,41 +37,30 @@ type helpModal struct {
 
 func helpSections(m *Model) []helpSection {
 	views := []helpEntry{{"d  0", "Dashboard"}}
-	var names []string
 	for i, r := range m.resources {
 		if i < 9 {
-			names = append(names, fmt.Sprintf("%d %s", i+1, r.Label()))
+			views = append(views, helpEntry{fmt.Sprint(i + 1), r.Label()})
 		}
 	}
-	if len(names) > 0 {
-		views = append(views, helpEntry{"1-" + fmt.Sprint(len(names)), strings.Join(names, " · ")})
-	}
 	if m.auth != nil && m.hasProfiles {
-		views = append(views, helpEntry{"p", "Profiles: switch the sign-in profile (enter)"})
+		views = append(views, helpEntry{"p", "Profiles"})
 	}
-	views = append(views, helpEntry{"?", "This help"}, helpEntry{"q  ctrl+c", "Quit"})
+	views = append(views, helpEntry{"?", "Help"}, helpEntry{"q", "Quit"})
 
 	secs := []helpSection{
-		{"Table", []helpEntry{
-			{"↑ ↓  j k", "Move selection"},
-			{"pgup pgdn", "Page up / down (ctrl+b / ctrl+f)"},
-			{"g  home", "Jump to the top"},
-			{"G  end", "Jump to the bottom"},
-			{"← →  h l", "Scroll columns"},
-			{"enter", "Open row (drill down) / SSH into host"},
-			{"S", "SSH into the host"},
-			{"esc", "Clear search, then go back"},
+		{title: "Table", entries: []helpEntry{
+			{"↑ ↓ j k", "move"}, {"pgup pgdn", "page"}, {"g home", "top"}, {"G end", "bottom"}, {"← → h l", "scroll columns"},
+			{"enter", "open row or ssh"}, {"S", "ssh"}, {"esc", "back"},
 		}},
-		{"Data", []helpEntry{
-			{"/  f  s", "Search rows (↑ ↓ recall earlier searches)"},
-			{"F", "Update server-side filters"},
-			{"r", "Refresh data"},
-			{"R", "Reset filters, search, sort"},
-			{"n  shift+→", "Load the next page"},
+		{title: "Data", entries: []helpEntry{
+			{"/ f s", "search"}, {"F", "filters"}, {"r", "refresh"}, {"R", "reset filters, search, sort"}, {"n", "next page"},
+		}},
+		{title: "Search & filters", entries: []helpEntry{
+			{"a|b", "search: a or b"}, {"!a", "search: not a"}, {"a,b", "filter: a or b"}, {"!a", "filter: not a"},
 		}},
 	}
 	if s := m.cur(); s != nil {
-		var keys []string
+		items := []helpEntry{{"shift+", "sorts, again reverses"}}
 		for i, c := range s.res.Columns() {
 			if k := s.sortKeys[i]; k != "" {
 				mark := ""
@@ -78,24 +70,15 @@ func helpSections(m *Model) []helpSection {
 						mark = "▼"
 					}
 				}
-				keys = append(keys, k+"="+strings.ReplaceAll(c.Title, " ", "\u00a0")+mark) // no wrapping inside a name
+				items = append(items, helpEntry{k, strings.ReplaceAll(c.Title, " ", "\u00a0") + mark}) // no wrapping inside a name
 			}
 		}
-		secs = append(secs, helpSection{"Sorting", []helpEntry{
-			{"shift+key", strings.Join(keys, "   ") + "   (press again to reverse)"},
-		}})
+		secs = append(secs, helpSection{title: "Sort", entries: items})
 	}
 	secs = append(secs,
-		helpSection{"Views", views},
-		helpSection{"Filters dialog (F)", []helpEntry{
-			{"type", "Fill in the filters you want"},
-			{"↑ ↓  tab", "Move between filters"},
-			{"enter  esc", "Apply / cancel"},
-		}},
-		helpSection{"SSH dialog (S)", []helpEntry{
-			{"tab  ↑ ↓", "Move between fields: user, address, method, route"},
-			{"← →", "Change a choice on its row (address, method, route)"},
-			{"enter  esc", "Connect / cancel"},
+		helpSection{title: "Views", entries: views, oneLine: true},
+		helpSection{title: "Dialogs", entries: []helpEntry{
+			{"tab ↑ ↓", "next field"}, {"← →", "change a choice"}, {"enter", "apply / connect"}, {"esc", "cancel"},
 		}},
 	)
 	return secs
@@ -111,32 +94,42 @@ func wrap(s string, w int) []string {
 	return strings.Split(ansi.Wrap(s, w, ""), "\n")
 }
 
-// renderSection draws one section at width w: a heading and its entries with
-// the key column sized to the longest key and descriptions wrapped.
+// renderSection draws one section at width w: a ruled heading, then either
+// one entry per line or compact "key label" chips wrapped between items.
 func renderSection(sec helpSection, w int) []string {
-	kw := 1
-	for _, e := range sec.entries {
-		kw = max(kw, lipgloss.Width(e.key))
-	}
-	kw = min(kw, min(helpMaxKeyW, w/3))
-	descW := max(w-2-kw-2, 8)
-
-	// a ruled heading ("── Table ─────") so sections read as separate blocks
 	rule := max(w-lipgloss.Width(sec.title)-4, 0)
 	out := []string{hintDescStyle.Render("── ") + headStyle.Render(sec.title) + hintDescStyle.Render(" "+strings.Repeat("─", rule))}
-	for _, e := range sec.entries {
-		keys, desc := wrap(e.key, kw), wrap(e.desc, descW)
-		for i := 0; i < max(len(keys), len(desc)); i++ {
-			k, d := "", ""
-			if i < len(keys) {
-				k = keys[i]
-			}
-			if i < len(desc) {
-				d = desc[i]
-			}
-			out = append(out, "  "+hintKeyStyle.Render(fit(k, kw))+"  "+hintDescStyle.Render(fit(d, descW)))
+
+	if sec.oneLine {
+		kw := 1
+		for _, e := range sec.entries {
+			kw = max(kw, lipgloss.Width(e.key))
 		}
+		for _, e := range sec.entries {
+			out = append(out, "  "+hintKeyStyle.Render(fit(e.key, kw))+"  "+hintDescStyle.Render(e.desc))
+		}
+		return append(out, "")
 	}
+
+	line, lineW := "  ", 2
+	flush := func() {
+		if lineW > 2 {
+			out = append(out, line)
+		}
+		line, lineW = "  ", 2
+	}
+	for _, e := range sec.entries {
+		item := hintKeyStyle.Render(e.key) + " " + hintDescStyle.Render(e.desc)
+		iw := lipgloss.Width(e.key) + 1 + lipgloss.Width(e.desc)
+		if lineW > 2 && lineW+3+iw > w {
+			flush()
+		}
+		if lineW > 2 {
+			line, lineW = line+"   ", lineW+3
+		}
+		line, lineW = line+item, lineW+iw
+	}
+	flush()
 	return append(out, "")
 }
 

@@ -190,15 +190,15 @@ func helpFixture(t *testing.T, w, h int) Model {
 	return m
 }
 
-func TestHelpShowsEverythingUntruncatedWhenThereIsRoom(t *testing.T) {
+func TestHelpShowsEverythingCompactlyWhenThereIsRoom(t *testing.T) {
 	v := helpFixture(t, 120, 30).View()
-	for _, want := range []string{"Table", "Data", "Sorting", "Views", "Filters dialog", "SSH dialog",
-		"pgup pgdn", "(ctrl+b / ctrl+f)", "g  home", "G  end", "I=ID", "N=Name", "P=Private\u00a0IP", "Move between fields", "Change a choice", "Connect / cancel"} {
+	for _, want := range []string{"Table", "Data", "Search & filters", "Sort", "Views", "Dialogs",
+		"pgup pgdn", "g home", "G end", "a|b", "a,b", "!a", "I ID", "N Name", "P Private\u00a0IP", "next field", "change a choice"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("help missing %q", want)
 		}
 	}
-	if strings.Contains(v, "scroll") {
+	if strings.Contains(v, "g G to scroll") {
 		t.Error("nothing should need scrolling at 120x30")
 	}
 	for _, l := range strings.Split(v, "\n") {
@@ -208,47 +208,64 @@ func TestHelpShowsEverythingUntruncatedWhenThereIsRoom(t *testing.T) {
 	}
 }
 
-func TestHelpWrapsLongDescriptionsInsteadOfCuttingThem(t *testing.T) {
-	// 60 columns => one narrow column, so longer text has to wrap
+func TestHelpViewsAreOnePerLine(t *testing.T) {
+	v := helpFixture(t, 120, 30).View()
+	lines := strings.Split(v, "\n")
+	for _, want := range []string{"Fake fake", "Fake o", "Dashboard", "Quit"} {
+		n := 0
+		for _, l := range lines {
+			if strings.HasPrefix(l, "│") && strings.Contains(l, want) { // panel lines only; the header repeats some words
+				n++
+			}
+		}
+		if n != 1 {
+			t.Errorf("%q should be on its own single line, found on %d", want, n)
+		}
+	}
+	if strings.Contains(v, "Profiles: switch") || strings.Contains(v, "Fill in the filters") {
+		t.Error("filler text should be gone")
+	}
+}
+
+func TestHelpWrapsBetweenItemsNeverInsideThem(t *testing.T) {
 	m := helpFixture(t, 60, 60)
 	v := strings.ReplaceAll(m.View(), "\u00a0", " ")
-	flat := strings.Join(strings.Fields(strings.NewReplacer("│", " ", "┌", " ", "┐", " ", "└", " ", "┘", " ", "─", " ").Replace(v)), " ")
-	for _, want := range []string{"Page up / down (ctrl+b / ctrl+f)", "Open row (drill down) / SSH into host", "Move between fields: user, address, method, route"} {
-		if !strings.Contains(flat, want) {
-			t.Errorf("wrapped help lost %q", want)
+	for _, want := range []string{"pgup pgdn page", "next field", "change a choice", "Private IP"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("an item was split or lost: %q\n%s", want, v)
 		}
 	}
 	for _, l := range strings.Split(v, "\n") {
-		if strings.HasPrefix(l, "│") && strings.Contains(l, "…") { // panel lines only; the header may truncate its own summary
+		if strings.HasPrefix(l, "│") && strings.Contains(l, "…") {
 			t.Errorf("wrapping must replace ellipses: %q", l)
 		}
 	}
 }
 
 func TestHelpScrollsWithGAndHome(t *testing.T) {
-	m := helpFixture(t, 80, 14) // far too small for everything
+	m := helpFixture(t, 80, 12) // far too small for everything
 	v := m.View()
-	if !strings.Contains(v, "g G to scroll") || !strings.Contains(v, "Table") || strings.Contains(v, "Connect / cancel") {
+	if !strings.Contains(v, "g G to scroll") || !strings.Contains(v, "Table") || strings.Contains(v, "cancel") {
 		t.Fatalf("small help should start at the top and offer scrolling:\n%s", v)
 	}
-	m, _ = send(m, key("G")) // bottom
-	if v := m.View(); !strings.Contains(v, "Connect / cancel") || strings.Contains(v, "Move selection") {
+	m, _ = send(m, key("G"))
+	if v := m.View(); !strings.Contains(v, "cancel") || strings.Contains(v, "── Table") {
 		t.Fatalf("G should jump to the bottom:\n%s", v)
 	}
-	m, _ = send(m, key("g")) // top
-	if v := m.View(); !strings.Contains(v, "Move selection") {
+	m, _ = send(m, key("g"))
+	if v := m.View(); !strings.Contains(v, "── Table") {
 		t.Fatalf("g should jump back to the top:\n%s", v)
 	}
 	m, _ = send(m, tea.KeyMsg{Type: tea.KeyEnd})
-	if !strings.Contains(m.View(), "Connect / cancel") {
+	if !strings.Contains(m.View(), "cancel") {
 		t.Fatal("end should jump to the bottom")
 	}
 	m, _ = send(m, tea.KeyMsg{Type: tea.KeyHome})
-	if !strings.Contains(m.View(), "Move selection") {
+	if !strings.Contains(m.View(), "── Table") {
 		t.Fatal("home should jump to the top")
 	}
 	m, _ = send(m, tea.KeyMsg{Type: tea.KeyPgDown})
-	if strings.Contains(m.View(), "Move selection") {
+	if strings.Contains(m.View(), "── Table") {
 		t.Fatal("pgdn should scroll")
 	}
 	m, cmd := send(m, key("q")) // q closes help, it must not quit
@@ -462,7 +479,7 @@ func TestSplashShowsFadesAndCanBeSkipped(t *testing.T) {
 
 func TestViewHasHeaderPanelTitleAndBreadcrumbs(t *testing.T) {
 	v := loaded(t, threeRows()).View()
-	for _, want := range []string{"Cloud:", "<enter/S>", "<r>", "<?>", "Fake[3]<all>", "<fake_fake>", "Pages: 1+", "alpha"} {
+	for _, want := range []string{"Cloud:", "<enter/S>", "<r>", "<?>", "Fake[3+]<all>", "<fake_fake>", "Pages: 1+", "alpha"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("view missing %q", want)
 		}
@@ -476,7 +493,7 @@ func TestTitleShowsSearch(t *testing.T) {
 	m := loaded(t, threeRows())
 	m, _ = send(m, key("/"))
 	m = typeKeys(m, "alp")
-	if !strings.Contains(m.View(), "Fake[1]</alp>") {
+	if !strings.Contains(m.View(), "Fake[1+]</alp>") {
 		t.Fatal("title should show count and search")
 	}
 }
@@ -570,5 +587,17 @@ func TestSearchSaysItOnlySeesLoadedRowsWhileMorePagesExist(t *testing.T) {
 	m, _ = send(m, key("esc")) // search cleared: no note
 	if strings.Contains(m.View(), "loaded so far") {
 		t.Fatal("no note without a search")
+	}
+}
+
+func TestTitleCountIsALowerBoundOnlyWhileMorePagesExist(t *testing.T) {
+	m := loaded(t, threeRows()) // has a next page
+	if !strings.Contains(m.View(), "Fake[3+]") {
+		t.Fatal("more pages: the count is a lower bound")
+	}
+	m = settle(m, func() tea.Cmd { _, c := send(m, key("n")); return c }())
+	m = loaded(t, fakeResource{pages: map[string]provider.Page{"": {Rows: rows("a", "b")}}})
+	if v := m.View(); !strings.Contains(v, "Fake[2]") || strings.Contains(v, "Fake[2+]") {
+		t.Fatalf("complete list: exact count\n%s", v)
 	}
 }

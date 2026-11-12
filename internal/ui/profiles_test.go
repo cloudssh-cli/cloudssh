@@ -267,7 +267,7 @@ func TestProfilesScreenListsInHelpAndDashboard(t *testing.T) {
 	f := &fakeAuthn{profile: "dev", access: "SSO (dev)", profiles: twoProfs}
 	m := signIn(t, f, &recorder{})
 	h, _ := send(m, key("?"))
-	if !strings.Contains(h.View(), "Profiles: switch the sign-in profile") {
+	if !strings.Contains(h.View(), "Profiles") {
 		t.Error("help should mention p")
 	}
 	h, _ = send(h, key("esc"))
