@@ -98,6 +98,8 @@ type Model struct {
 	forward   [][]*screen // per mode: screens left with [ that ] can bring back
 	views     []int       // views visited, oldest first; { and } walk it like browser back/forward
 	viewPos   int
+	lastView  int  // the view before this one: "-" toggles back to it
+	hasLast   bool // lastView is set
 	mode      int
 	nextID    int
 
@@ -110,7 +112,8 @@ type Model struct {
 	// detectTunnels lists tunnels the user already runs (replaceable in tests).
 	detectTunnels func(context.Context) []sshx.LocalTunnel
 	splashing     bool
-	splashHeld    bool // the logo was already held (by Boot): Init starts the fade at once
+	splashNote    string // caption under the logo ("✓ signed in · ...")
+	splashHeld    bool   // the logo was already held (by Boot): Init starts the fade at once
 	splashAt      int
 	spin          int  // frame of the loading indicator
 	spinning      bool // a spin tick is pending
@@ -301,6 +304,9 @@ func (m *Model) stepView(d int) tea.Cmd {
 }
 
 func (m *Model) enterMode(i int) tea.Cmd {
+	if i != m.mode {
+		m.lastView, m.hasLast = m.mode, true // what "-" returns to
+	}
 	m.mode = i
 	m.filtering = false
 	m.layout()
@@ -735,6 +741,12 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch k {
+	case "-": // toggle between this view and the one before it, like cd -
+		if !m.hasLast {
+			return m, m.setStatus("no other view to switch to")
+		}
+		cmd := m.switchMode(m.lastView)
+		return m, cmd
 	case "{", "}": // back / forward through the views visited
 		cmd := m.stepView(map[string]int{"{": -1, "}": 1}[k])
 		return m, cmd
@@ -1144,7 +1156,7 @@ func (m Model) View() string {
 		return ""
 	}
 	if m.splashing {
-		return splashView(m.width, m.height, m.splashAt)
+		return splashView(m.width, m.height, m.splashAt, m.splashNote)
 	}
 	s := m.cur()
 	parts := []string{renderHeader(m.infos(), m.hints(), m.width)}

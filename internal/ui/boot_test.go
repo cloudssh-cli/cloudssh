@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -13,7 +14,7 @@ import (
 func bootWith(open func() (provider.Provider, error)) Boot {
 	cfg := testCfg()
 	cfg.SkipSplash = false
-	b := NewBoot(cfg, open)
+	b := NewBoot(cfg, open, false)
 	next, _ := b.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	return next.(Boot)
 }
@@ -28,33 +29,58 @@ func fakeOpen() (provider.Provider, error) {
 }
 
 // The logo is on screen while the provider is still opening, and only
-// becomes the real UI when both the provider and the minimum hold are done.
+// becomes the real UI when the provider, the hold and the "signed in" moment are done.
 func TestBootShowsLogoWhileSigningIn(t *testing.T) {
 	b := bootWith(fakeOpen)
-	if !strings.Contains(b.View(), "/ ____/") {
-		t.Fatal("the logo must show before the provider is open")
+	if v := b.View(); !strings.Contains(v, "/ ____/") || !strings.Contains(v, "signing in...") {
+		t.Fatalf("logo and caption must show before the provider is open:\n%s", v)
 	}
 	b, _ = bootSend(b, bootHeldMsg{}) // hold over, provider still opening
 	if b.inner != nil || !strings.Contains(b.View(), "signing in...") {
 		t.Fatalf("must keep waiting and say so:\n%s", b.View())
 	}
 	b, cmd := bootSend(b, bootDoneMsg{prov: fakeProvider{[]provider.Resource{threeRows()}}})
+	if b.inner != nil || cmd == nil || !strings.Contains(b.View(), "✓ ready") {
+		t.Fatalf("signed in: say so for a moment before the fade:\n%s", b.View())
+	}
+	b, cmd = bootSend(b, bootShownMsg{})
 	if b.inner == nil || cmd == nil {
-		t.Fatal("provider ready and hold over: the real UI must start")
+		t.Fatal("then the real UI must start")
 	}
 	m := b.inner.(Model)
-	if !m.splashing || !m.splashHeld || m.width != 120 {
-		t.Fatalf("the fade must follow at once, sized: splashing=%v held=%v w=%d", m.splashing, m.splashHeld, m.width)
+	if !m.splashing || !m.splashHeld || m.width != 120 || m.splashNote != "✓ ready" {
+		t.Fatalf("the fade must follow at once, sized, keeping the caption: %+v", m.splashNote)
+	}
+}
+
+func TestBootCaptionsDemoAndSignedIn(t *testing.T) {
+	d := NewBoot(testCfg(), fakeOpen, true)
+	if d.caption() != "loading demo data..." {
+		t.Fatalf("demo caption: %q", d.caption())
+	}
+	d.held, d.ready = true, &bootDoneMsg{prov: fakeProvider{}}
+	if d.caption() != "✓ demo data loaded" {
+		t.Fatalf("demo done: %q", d.caption())
+	}
+	s := NewBoot(testCfg(), fakeOpen, false)
+	s.held, s.ready = true, &bootDoneMsg{prov: authedProvider{access: "SSO (prod)"}}
+	if s.caption() != "✓ signed in · SSO (prod)" {
+		t.Fatalf("signed in: %q", s.caption())
+	}
+	s.ready = &bootDoneMsg{prov: authedProvider{err: errors.New("no creds")}}
+	if s.caption() != "not signed in" {
+		t.Fatalf("signed out: %q", s.caption())
 	}
 }
 
 func TestBootWaitsForTheHoldEvenWhenTheProviderIsFast(t *testing.T) {
 	b := bootWith(fakeOpen)
 	b, _ = bootSend(b, bootDoneMsg{prov: fakeProvider{}})
-	if b.inner != nil {
-		t.Fatal("the logo must stay for its minimum time")
+	if b.inner != nil || !strings.Contains(b.View(), "signing in...") {
+		t.Fatal("the logo keeps its loading caption for its minimum time")
 	}
-	if b, _ = bootSend(b, bootHeldMsg{}); b.inner == nil {
+	b, _ = bootSend(b, bootHeldMsg{})
+	if b, _ = bootSend(b, bootShownMsg{}); b.inner == nil {
 		t.Fatal("then it starts")
 	}
 }
@@ -109,7 +135,7 @@ func TestBootInitOpensInTheBackground(t *testing.T) {
 
 func TestBootSkipSplashShowsNothingAndStartsAtOnce(t *testing.T) {
 	cfg := testCfg() // SkipSplash
-	b := NewBoot(cfg, fakeOpen)
+	b := NewBoot(cfg, fakeOpen, false)
 	b, _ = bootSend(b, tea.WindowSizeMsg{Width: 100, Height: 30})
 	if b.View() != "" {
 		t.Fatal("no logo when the splash is skipped")
@@ -138,3 +164,18 @@ func TestLoadingIndicatorAnimatesOnlyDuringTheFirstLoad(t *testing.T) {
 		t.Fatal("no more ticks once loaded")
 	}
 }
+
+// authedProvider is a provider that can sign in (or not).
+type authedProvider struct {
+	fakeProvider
+	access string
+	err    error
+}
+
+func (a authedProvider) AuthError() error                         { return a.err }
+func (a authedProvider) Access() string                           { return a.access }
+func (a authedProvider) Region() string                           { return "" }
+func (a authedProvider) Identity() provider.Identity              { return provider.Identity{} }
+func (a authedProvider) Profile() string                          { return "" }
+func (a authedProvider) Profiles() []provider.ProfileInfo         { return nil }
+func (a authedProvider) UseProfile(context.Context, string) error { return a.err }

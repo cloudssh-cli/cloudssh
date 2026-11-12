@@ -114,7 +114,7 @@ func NewRootCmd() *cobra.Command {
 			// The TUI starts first and signs in behind the splash: opening a
 			// cloud can take seconds (SSO, token refresh) and must not leave
 			// a blank terminal.
-			final, err := tea.NewProgram(ui.NewBoot(cfg, open), tea.WithAltScreen()).Run()
+			final, err := tea.NewProgram(ui.NewBoot(cfg, open, demo), tea.WithAltScreen()).Run()
 			if err != nil {
 				return err
 			}

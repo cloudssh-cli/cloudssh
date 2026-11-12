@@ -37,7 +37,7 @@ type helpModal struct {
 }
 
 func helpSections(m *Model) []helpSection {
-	views := []helpEntry{{"d  0", "Dashboard"}, {"{  }", "back / forward through views"}}
+	views := []helpEntry{{"d  0", "Dashboard"}, {"{  }", "back / forward through views"}, {"-", "toggle with the previous view"}}
 	for i, r := range m.resources {
 		if i < 9 {
 			views = append(views, helpEntry{fmt.Sprint(i + 1), r.Label()})

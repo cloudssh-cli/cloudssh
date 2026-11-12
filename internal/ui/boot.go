@@ -1,11 +1,9 @@
 package ui
 
 import (
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/config"
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
@@ -17,8 +15,13 @@ type bootDoneMsg struct {
 	err  error
 }
 
-// bootHeldMsg ends the minimum time the logo stays up.
+// bootHeldMsg ends the minimum time the logo stays up with its "loading" caption.
 type bootHeldMsg struct{}
+
+// bootShownMsg ends the short time the "signed in" caption stays readable.
+type bootShownMsg struct{}
+
+const bootShown = 200 * time.Millisecond
 
 // Boot is what the program runs first. Opening a cloud can take seconds (token
 // refresh, SSO, identity lookups), so it happens in the background while the
@@ -27,17 +30,21 @@ type bootHeldMsg struct{}
 type Boot struct {
 	cfg  config.Config
 	open func() (provider.Provider, error)
+	demo bool
 
 	w, h  int
 	ready *bootDoneMsg
-	held  bool
+	held  bool      // the logo has had its minimum time
+	shown bool      // the "signed in" caption has been readable for a moment
+	armed bool      // the timer for shown is running
 	inner tea.Model // the real Model, once started
 	err   error
 }
 
 // NewBoot returns the starting model. open is called once, off the UI thread.
-func NewBoot(cfg config.Config, open func() (provider.Provider, error)) Boot {
-	return Boot{cfg: cfg, open: open, held: cfg.SkipSplash}
+// demo only changes the wording of the caption.
+func NewBoot(cfg config.Config, open func() (provider.Provider, error), demo bool) Boot {
+	return Boot{cfg: cfg, open: open, demo: demo, held: cfg.SkipSplash, shown: cfg.SkipSplash}
 }
 
 // Err is why the provider could not be opened, nil otherwise.
@@ -67,27 +74,59 @@ func (b Boot) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		b.ready = &msg
 	case bootHeldMsg:
 		b.held = true
+	case bootShownMsg:
+		b.shown = true
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return b, tea.Quit
 		}
-		b.held = true // any key skips the wait for the logo
+		b.held, b.shown = true, true // any key skips the waits for the logo
+	}
+	if b.ready != nil && b.ready.err == nil && b.held && !b.shown && !b.armed {
+		b.armed = true // let "signed in" be read before the fade
+		return b, tea.Tick(bootShown, func(time.Time) tea.Msg { return bootShownMsg{} })
 	}
 	return b.maybeStart()
+}
+
+// caption is the line under the logo: what is happening, then how it went.
+func (b Boot) caption() string {
+	switch {
+	case b.ready == nil || !b.held:
+		if b.demo {
+			return "loading demo data..."
+		}
+		return "signing in..."
+	case b.ready.err != nil:
+		return ""
+	}
+	if b.demo {
+		return "✓ demo data loaded"
+	}
+	if a, ok := b.ready.prov.(provider.Authenticator); ok {
+		if a.AuthError() != nil {
+			return "not signed in"
+		}
+		if acc := a.Access(); acc != "" {
+			return "✓ signed in · " + acc
+		}
+	}
+	return "✓ ready"
 }
 
 // maybeStart swaps in the real Model once the provider is open and the logo
 // has been shown long enough.
 func (b Boot) maybeStart() (tea.Model, tea.Cmd) {
-	if b.ready == nil || !b.held {
-		return b, nil
-	}
-	if b.ready.err != nil {
+	if b.ready != nil && b.ready.err != nil { // nothing to show: report it now
 		b.err = b.ready.err
 		return b, tea.Quit
 	}
+	if b.ready == nil || !b.held || !b.shown {
+		return b, nil
+	}
 	m := New(b.cfg, b.ready.prov)
 	m.splashHeld = true // the hold already happened: go straight to the fade
+	m.splashNote = b.caption()
 	var sized tea.Model = m
 	var cmd tea.Cmd
 	if b.w > 0 {
@@ -104,9 +143,5 @@ func (b Boot) View() string {
 	if b.cfg.SkipSplash || b.w == 0 {
 		return ""
 	}
-	lines := strings.Split(splashView(b.w, b.h, 0), "\n")
-	if n := len(lines); n > 0 && b.held && b.ready == nil { // the minimum hold is over and we are still waiting
-		lines[n-1] = lipgloss.PlaceHorizontal(b.w, lipgloss.Center, hintDescStyle.Render("signing in..."))
-	}
-	return strings.Join(lines, "\n")
+	return splashView(b.w, b.h, 0, b.caption())
 }

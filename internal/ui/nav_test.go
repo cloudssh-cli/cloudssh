@@ -678,3 +678,23 @@ func TestRefreshDropsBackgroundLoadsOfTheOldList(t *testing.T) {
 		t.Fatal("a stale prefetch must do nothing")
 	}
 }
+
+func TestHyphenTogglesBetweenTheTwoLatestViews(t *testing.T) {
+	a := fakeResource{key: "a", pages: map[string]provider.Page{"": {Rows: rows("a1")}}}
+	b := fakeResource{key: "b", pages: map[string]provider.Page{"": {Rows: rows("b1")}}}
+	m := newModelWith(testCfg(), a, b)
+	m, _ = send(m, key("-"))
+	if m.mode != 1 || !strings.Contains(m.status, "no other view") {
+		t.Fatalf("nothing to toggle to yet: mode=%d status=%q", m.mode, m.status)
+	}
+	m, _ = send(m, key("2"))
+	for i, want := range []int{1, 2, 1} {
+		if m, _ = send(m, key("-")); m.mode != want {
+			t.Fatalf("toggle %d: mode=%d want %d", i, m.mode, want)
+		}
+	}
+	m, _ = send(m, key("d"))
+	if m, _ = send(m, key("-")); m.mode != 1 {
+		t.Fatalf("- returns from the dashboard to where you were: %d", m.mode)
+	}
+}

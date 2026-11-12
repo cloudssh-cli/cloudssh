@@ -40,6 +40,7 @@ Start on a specific screen with `--view dashboard|ec2|ecs|eks|asg|vpc`. Press `?
 | `↑↓` `j k` · `pgup pgdn` · `g G` | move |
 | `enter` | drill into the row (ASG → instances, VPC → subnets → instances, ECS cluster → services → tasks → instance, EKS cluster → node groups → instances); on instances, SSH |
 | `esc` `[` · `]` | clear search, then go back one level inside the view (`[` goes back, `]` forward again) |
+| `-` | toggle between this view and the previous one |
 | `{` `}` | back / forward through the views you visited (dashboard, EC2, ECS, …), like a browser |
 | `S` | SSH dialog: user, private/public IP, command preview, and a *Method* choice (`tab` to the row, `←/→` to change) to connect with [EC2 Instance Connect](#ec2-instance-connect) instead of your own key |
 | `/` `f` `s` | search loaded rows. One syntax for search and filters: a space or `&` is AND, `\|` or `,` is OR, `!a` is NOT, `( )` groups. A space separates whole conditions, each evaluated on its own and ANDed: `web\|api !canary` = (web or api) and not canary; inside one condition `&` binds tighter than `\|` (`↑↓` in the box recall previous searches). The first page shows at once, the next few load in the background, and opening search loads more; the title shows `[25+]` while pages remain |
