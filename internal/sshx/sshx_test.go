@@ -1,9 +1,12 @@
 package sshx
 
 import (
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
@@ -51,5 +54,35 @@ func TestArgsIncludeKeyOnlyWhenPemExists(t *testing.T) {
 	got, _ = Resolve(h, "u", "private", dir)
 	if want := []string{"-i", pem, "u@10.0.0.5"}; !reflect.DeepEqual(got.Args(), want) {
 		t.Fatalf("with pem: got %v", got.Args())
+	}
+}
+
+func TestArgsOnlyKeyAddsIdentitiesOnly(t *testing.T) {
+	got := strings.Join(Target{User: "ec2-user", Address: "10.0.0.1", KeyFile: "/k", OnlyKey: true}.Args(), " ")
+	if got != "-i /k -o IdentitiesOnly=yes ec2-user@10.0.0.1" {
+		t.Fatalf("args: %s", got)
+	}
+	if got := strings.Join(Target{User: "u", Address: "a", KeyFile: "/k"}.Args(), " "); got != "-i /k u@a" {
+		t.Fatalf("plain args: %s", got)
+	}
+}
+
+func TestNewTempKeyGeneratesAndCleansUp(t *testing.T) {
+	if _, err := exec.LookPath("ssh-keygen"); err != nil {
+		t.Skip("ssh-keygen not installed")
+	}
+	k, err := NewTempKey(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(k.Public, "ssh-ed25519 ") {
+		t.Fatalf("public key: %q", k.Public)
+	}
+	if _, err := os.Stat(k.Path); err != nil {
+		t.Fatal("private key missing")
+	}
+	k.Cleanup()
+	if _, err := os.Stat(k.Dir); !os.IsNotExist(err) {
+		t.Fatal("cleanup should remove the key directory")
 	}
 }

@@ -16,6 +16,9 @@ type Target struct {
 	User    string
 	Address string
 	KeyFile string // optional
+	// OnlyKey makes ssh offer just KeyFile (IdentitiesOnly), needed for
+	// short-lived keys so agent keys don't exhaust the server's auth attempts.
+	OnlyKey bool
 }
 
 // Args returns the argument vector for ssh (without the binary name).
@@ -23,6 +26,9 @@ func (t Target) Args() []string {
 	var args []string
 	if t.KeyFile != "" {
 		args = append(args, "-i", t.KeyFile)
+		if t.OnlyKey {
+			args = append(args, "-o", "IdentitiesOnly=yes")
+		}
 	}
 	return append(args, t.User+"@"+t.Address)
 }
