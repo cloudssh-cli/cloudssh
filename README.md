@@ -79,7 +79,7 @@ make run     # run the TUI in a container (mounts ~/.aws and ~/.ssh read-only)
 make help
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). The previous Python implementation is on the `main-python` branch.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

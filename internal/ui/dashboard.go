@@ -9,7 +9,7 @@ import (
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
 
-// logo is "CLOUD SSH" in figlet's slant font, like the Python app.
+// logo is "CLOUD SSH" in figlet's slant font.
 const logo = `   ________    ____  __  ______     __________ __  __
   / ____/ /   / __ \/ / / / __ \   / ___/ ___// / / /
  / /   / /   / / / / / / / / / /   \__ \\__ \/ /_/ /

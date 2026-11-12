@@ -112,7 +112,7 @@ func (t *table) end()      { t.move(len(t.rows)) }
 type vcol struct{ idx, w int }
 
 // visibleCols picks the columns that fit starting at colStart. The last one
-// may be shown truncated, like the Python app's partial column.
+// may be shown truncated.
 func (t *table) visibleCols() []vcol {
 	avail := t.innerWidth() - 1 // leading space
 	var out []vcol

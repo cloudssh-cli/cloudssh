@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Palette ported from the Python app's default theme.
+// Default colour palette.
 var (
 	colFg        = lipgloss.Color("#6FD0FF")
 	colPrimary   = lipgloss.Color("#FF00FF")

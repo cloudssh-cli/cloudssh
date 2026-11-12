@@ -64,7 +64,7 @@ type (
 
 // Model is the root Bubble Tea model. Each mode (0 = dashboard, 1..n = the
 // provider's resources) keeps its own stack of screens, so switching views
-// preserves where you were, like the Python app's Textual modes.
+// preserves where you were.
 type Model struct {
 	cfg       config.Config
 	prov      provider.Provider

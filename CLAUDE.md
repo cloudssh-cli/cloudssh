@@ -1,7 +1,6 @@
 # cloudssh
 
 k9s-style terminal UI (Go, Bubble Tea) to browse cloud resources (AWS first) and SSH into them.
-The previous Python/Textual implementation lives on the `main-python` branch.
 
 ## Layout
 - `cmd/cloudssh` – entrypoint only

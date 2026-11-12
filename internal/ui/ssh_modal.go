@@ -17,7 +17,7 @@ import (
 
 const authTimeout = 20 * time.Second
 
-// sshModal is the Python app's SshScreen: pick user, IP and method, preview
+// sshModal lets the user pick the user, IP and method, preview
 // the command, then hand the terminal to ssh. When the provider can push a
 // temporary key (EC2 Instance Connect) the method can be switched with ctrl+t.
 type sshModal struct {
