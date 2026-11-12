@@ -114,7 +114,7 @@ type vcol struct{ idx, w int }
 // visibleCols picks the columns that fit starting at colStart. The last one
 // may be shown truncated.
 func (t *table) visibleCols() []vcol {
-	avail := t.innerWidth() - 2 // leading space, and a last cell for the "more columns" arrow
+	avail := t.innerWidth() - gutter - 2 // left gutter, then room for a space and the "more columns" marker
 	var out []vcol
 	used := 0
 	for i := t.colStart; i < len(t.cols); i++ {
@@ -149,6 +149,10 @@ func (t *table) scrollRight() {
 	t.colStart = min(t.colStart+1, len(t.cols)-1)
 }
 
+// gutter is the blank margin left of every row; the header shows « in it when
+// columns are scrolled out on the left.
+const gutter = 2
+
 func (t *table) scrollLeft() { t.colStart = max(t.colStart-1, 0) }
 
 func (t *table) headerLine(vis []vcol) string {
@@ -160,16 +164,18 @@ func (t *table) headerLine(vis []vcol) string {
 		}
 		parts[i] = st.Render(fit(t.label(v.idx), v.w))
 	}
-	line := " " + strings.Join(parts, strings.Repeat(" ", colGap))
-	// arrows say there is more off screen: ‹ columns to the left, › to the right
+	lead := strings.Repeat(" ", gutter)
+	// markers say there is more off screen: « columns to the left, » to the right;
+	// bold chips so they stand out from the headings, with a space either side
 	if t.colStart > 0 {
-		line = hintKeyStyle.Render("‹") + line[1:]
+		lead = crumbActive.Render("«") + strings.Repeat(" ", gutter-1)
 	}
+	line := lead + strings.Join(parts, strings.Repeat(" ", colGap))
 	if n := len(vis); n > 0 {
 		last := vis[n-1]
 		if last.idx < len(t.cols)-1 || last.w < t.widths[last.idx] {
 			if pad := t.innerWidth() - lipgloss.Width(line) - 1; pad >= 0 {
-				line += strings.Repeat(" ", pad) + hintKeyStyle.Render("›")
+				line += strings.Repeat(" ", pad) + crumbActive.Render("»")
 			}
 		}
 	}
@@ -190,7 +196,7 @@ func (t *table) rowLine(i int, vis []vcol) string {
 		for j, v := range vis {
 			parts[j] = cell(v)
 		}
-		line := " " + strings.Join(parts, strings.Repeat(" ", colGap))
+		line := strings.Repeat(" ", gutter) + strings.Join(parts, strings.Repeat(" ", colGap))
 		return selectedStyle.Render(fit(line, t.innerWidth()))
 	}
 	parts := make([]string, len(vis))
@@ -198,7 +204,7 @@ func (t *table) rowLine(i int, vis []vcol) string {
 		c := cell(v)
 		parts[j] = styleFor(c).Render(c)
 	}
-	return " " + strings.Join(parts, strings.Repeat(" ", colGap))
+	return strings.Repeat(" ", gutter) + strings.Join(parts, strings.Repeat(" ", colGap))
 }
 
 // render draws the panel. empty is shown in the middle when there are no rows.

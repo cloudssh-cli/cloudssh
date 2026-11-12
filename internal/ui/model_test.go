@@ -658,16 +658,16 @@ func TestHeaderArrowsShowHiddenColumns(t *testing.T) {
 	tb.setRows([]provider.Row{{Cells: []string{"1", "2", "3"}}})
 	tb.resize(30, 8)
 	head := func() string { return strings.Split(tb.render("t", ""), "\n")[1] }
-	if h := head(); !strings.Contains(h, "›") || strings.Contains(h, "‹") {
-		t.Fatalf("columns hidden on the right: only › expected: %q", h)
+	if h := head(); !strings.Contains(h, "»") || strings.Contains(h, "«") {
+		t.Fatalf("columns hidden on the right: only » expected: %q", h)
 	}
 	tb.scrollRight()
-	if h := head(); !strings.Contains(h, "‹") {
-		t.Fatalf("scrolled right: ‹ expected: %q", h)
+	if h := head(); !strings.Contains(h, "«") {
+		t.Fatalf("scrolled right: « expected: %q", h)
 	}
 	tb.resize(120, 8)
 	tb.colStart = 0
-	if h := head(); strings.Contains(h, "›") || strings.Contains(h, "‹") {
+	if h := head(); strings.Contains(h, "»") || strings.Contains(h, "«") {
 		t.Fatalf("everything fits: no arrows: %q", h)
 	}
 }
