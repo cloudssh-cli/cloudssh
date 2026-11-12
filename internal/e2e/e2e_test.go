@@ -7,6 +7,7 @@ package e2e
 
 import (
 	"context"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -166,8 +167,7 @@ func TestSearchOnlySeesLoadedPagesAndSaysSo(t *testing.T) {
 	for i := 0; i < 6; i++ {
 		m = press(m, "n")
 	}
-	mustContain(t, m, "batch-worker-25")
-	mustNotContain(t, m, "Searched ")
+	mustContain(t, m, "batch-worker-25", "Searched ") // the fleet is bigger than seven pages: the note stays until everything is loaded
 }
 
 func TestSearchNarrowsTheLoadedRows(t *testing.T) {
@@ -304,13 +304,16 @@ func TestEveryDemoScreenFitsTheTerminal(t *testing.T) {
 	}
 }
 
-// With the default demo page size the sample fleet spans exactly two pages.
-func TestDemoDefaultsToTwoPages(t *testing.T) {
+// With the default demo page size the 100+ sample machines span five pages.
+func TestDemoHasOverAHundredMachinesInFivePagesOfTwentyFive(t *testing.T) {
 	m := start(t, aws.NewDemo(25), 150, 40)
 	mustContain(t, m, "Pages: 1+")
-	m = press(m, "n")
-	mustContain(t, m, "Pages: 2")
-	mustNotContain(t, m, "Pages: 2+")
+	m = press(m, "n", "n", "n", "n")
+	mustContain(t, m, "Pages: 5")
+	mustNotContain(t, m, "Pages: 5+")
+	if !regexp.MustCompile(`Instances\[1\d\d\]`).MatchString(m.View()) { // 100+ running machines, counted exactly now
+		t.Errorf("the demo should hold 100+ running machines:\n%s", m.View())
+	}
 }
 
 func TestFilterDialogAcceptsOrAndNot(t *testing.T) {
@@ -329,10 +332,11 @@ func TestFilterDialogAcceptsOrAndNot(t *testing.T) {
 // the search box brings in the rest so a search sees (nearly) everything.
 func TestBackgroundPagesThenSearchLoadsTheRest(t *testing.T) {
 	m := startWith(t, aws.NewDemo(10), 150, 40, func(c *config.Config) { c.Prefetch, c.SearchPrefetch = 3, 10 })
-	mustContain(t, m, "Pages: 4+", "Instances[40+]") // page 1 plus three background pages; one page still missing
+	mustContain(t, m, "Pages: 4+", "Instances[40+]") // page 1 plus three background pages; the rest still missing
 	m = press(m, "/")
-	mustContain(t, m, "Pages: 5")
-	mustNotContain(t, m, "Pages: 5+")
+	if regexp.MustCompile(`Pages: \d+\+`).MatchString(m.View()) || strings.Contains(m.View(), "+]") {
+		t.Errorf("opening search should have loaded everything:\n%s", m.View())
+	}
 	m = typeText(m, "batch-worker-2")
 	mustContain(t, m, "batch-worker-25") // it lived on a page that only the search brought in
 }

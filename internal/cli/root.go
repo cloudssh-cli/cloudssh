@@ -18,9 +18,9 @@ import (
 	"github.com/SVMadhavaReddy/cloudssh/internal/version"
 )
 
-// demoPageSize: the sample fleet then spans five pages, so even after the background
-// pages load there is more to ask for with n, and search has something to widen.
-const demoPageSize = 10
+// demoPageSize: with 100+ sample machines this is five pages, so even after the
+// background pages load there is more to ask for with n, and search has more to widen.
+const demoPageSize = 25
 
 func NewRootCmd() *cobra.Command {
 	var (
