@@ -11,7 +11,7 @@ func TestLoadMissingFileUsesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Cloud != "aws" || cfg.PageSize != 50 {
+	if cfg.Cloud != "aws" || cfg.PageSize != 100 {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
 }

@@ -97,8 +97,15 @@ func typeText(m ui.Model, s string) ui.Model {
 
 func start(t *testing.T, p provider.Provider, w, h int) ui.Model {
 	t.Helper()
+	return startWith(t, p, w, h, func(c *config.Config) { c.Prefetch, c.SearchPrefetch = 0, 0 })
+}
+
+// startWith builds the UI over p with the default test config adjusted by mut.
+func startWith(t *testing.T, p provider.Provider, w, h int, mut func(*config.Config)) ui.Model {
+	t.Helper()
 	cfg := config.Default()
-	cfg.SkipSplash, cfg.PageSize = true, 8
+	cfg.SkipSplash, cfg.PageSize, cfg.PrefetchDelayMs = true, 8, 0
+	mut(&cfg)
 	m := ui.New(cfg, p)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 	m = next.(ui.Model)
@@ -154,13 +161,13 @@ func TestSearchOnlySeesLoadedPagesAndSaysSo(t *testing.T) {
 	m := demo(t)
 	m = typeText(press(m, "/"), "batch-worker-2")
 	m = press(m, "enter")
-	mustContain(t, m, "Searching the 8 rows loaded so far", "n to load more")
+	mustContain(t, m, "Searched 8 rows", "n to load more")
 	mustNotContain(t, m, "batch-worker-25") // not loaded yet, so a search cannot find it
 	for i := 0; i < 6; i++ {
 		m = press(m, "n")
 	}
 	mustContain(t, m, "batch-worker-25")
-	mustNotContain(t, m, "Searching the")
+	mustNotContain(t, m, "Searched ")
 }
 
 func TestSearchNarrowsTheLoadedRows(t *testing.T) {
@@ -316,4 +323,16 @@ func TestFilterDialogAcceptsOrAndNot(t *testing.T) {
 		t.Errorf("web-prod-4 must be excluded from the rows (seen %d times):\n%s", n, m.View())
 	}
 	mustNotContain(t, m, "bastion-01")
+}
+
+// The first page shows at once, the next few arrive by themselves, and opening
+// the search box brings in the rest so a search sees (nearly) everything.
+func TestBackgroundPagesThenSearchLoadsTheRest(t *testing.T) {
+	m := startWith(t, aws.NewDemo(10), 150, 40, func(c *config.Config) { c.Prefetch, c.SearchPrefetch = 3, 10 })
+	mustContain(t, m, "Pages: 4+", "Instances[40+]") // page 1 plus three background pages; one page still missing
+	m = press(m, "/")
+	mustContain(t, m, "Pages: 5")
+	mustNotContain(t, m, "Pages: 5+")
+	m = typeText(m, "batch-worker-2")
+	mustContain(t, m, "batch-worker-25") // it lived on a page that only the search brought in
 }

@@ -98,6 +98,7 @@ func rows(names ...string) []provider.Row {
 func testCfg() config.Config {
 	c := config.Default()
 	c.SkipSplash = true
+	c.Prefetch, c.SearchPrefetch, c.PrefetchDelayMs = 0, 0, 0 // tests opt in to background loading
 	return c
 }
 

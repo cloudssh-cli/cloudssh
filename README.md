@@ -19,7 +19,7 @@ make run     # run the TUI in a container
 cloudssh --demo
 ```
 
-Runs on built-in sample data (three realistic accounts: EC2, Auto Scaling, VPC, ECS, EKS, profiles to switch between, enough machines to page through). No cloud account or network is used, and SSH opens a harmless local shell that shows the command it would have run. Try `--demo --page-size 5` to see paging and search limits more clearly.
+Runs on built-in sample data (three realistic accounts: EC2, Auto Scaling, VPC, ECS, EKS, profiles to switch between, enough machines to page through). No cloud account or network is used, and SSH opens a harmless local shell that shows the command it would have run. The demo pages by 10, so background loading and `n` are both easy to see; `--page-size 5` makes it more obvious.
 
 ## Usage
 
@@ -41,8 +41,8 @@ Start on a specific screen with `--view dashboard|ec2|ecs|eks|asg|vpc`. Press `?
 | `enter` | drill into the row (ASG → instances, VPC → subnets → instances, ECS cluster → services → tasks → instance, EKS cluster → node groups → instances); on instances, SSH |
 | `esc` | clear search, then go back one level |
 | `S` | SSH dialog: user, private/public IP, command preview, and a *Method* choice (`tab` to the row, `←/→` to change) to connect with [EC2 Instance Connect](#ec2-instance-connect) instead of your own key |
-| `/` `f` `s` | search loaded rows: `a\|b` means a or b, a space means and, `!a` means not a (`↑↓` in the box recall previous searches). The title shows `[25+]` and the footer says so while more pages exist |
-| `F` | server-side filters: every filter (name, state, type, AZ, IPs, ASG, …) is listed, fill in the ones you want; `a,b` means a or b and `!a` means not a (`R` resets them all) |
+| `/` `f` `s` | search loaded rows: `a\|b` means a or b, a space means and, `!a` means not a (`↑↓` in the box recall previous searches). The first page shows at once, the next few load in the background, and opening search loads more; the title shows `[25+]` while pages remain |
+| `F` | server-side filters: every filter (name, state, type, AZ, IPs, ASG, …) is listed, fill in the ones you want; `a,b` means a or b, `&a,b` means a and b, `!a` means not a (`R` resets them all) |
 | `shift`+letter | sort by a column, again to reverse (letters listed in `?`) |
 | `r` · `R` | refresh · reset filters, search and sort to defaults |
 | `n` `shift+→` | load next page |
@@ -59,7 +59,10 @@ region: us-east-1
 pem_files_path: ~/.cloudssh/pems   # <key-pair-name>.pem is passed with -i when present
 default_ip_type: private           # or public
 ssh_method: ssh                    # or temporary-key (a short-lived key pushed through the cloud, e.g. EC2 Instance Connect)
-page_size: 50
+page_size: 100                     # rows per page (AWS allows up to 1000 for EC2/VPC, 100 for Auto Scaling; EKS is capped lower)
+prefetch_pages: 3                  # pages loaded in the background after the first
+search_prefetch_pages: 10          # extra pages loaded when you open search
+prefetch_delay_ms: 250             # pause between background pages
 view: ec2                          # dashboard, ec2, ecs, eks, asg or vpc
 skip_splash: false
 ```

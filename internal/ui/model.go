@@ -63,6 +63,9 @@ type authDoneMsg struct {
 	err     error
 }
 
+// prefetchMsg asks a screen to load its next page in the background.
+type prefetchMsg struct{ sid, gen int }
+
 type (
 	sshDoneMsg     struct{ err error }
 	clearStatusMsg struct{ seq int }
@@ -306,6 +309,15 @@ func (m *Model) command(t sshx.Target) *exec.Cmd {
 	return t.Command()
 }
 
+// prefetchTick schedules the next background page, if the screen may load more.
+func (m Model) prefetchTick(s *screen) tea.Cmd {
+	if s.budget <= 0 || s.nextToken == "" {
+		return nil
+	}
+	sid, gen := s.id, s.gen
+	return tea.Tick(time.Duration(m.cfg.PrefetchDelayMs)*time.Millisecond, func(time.Time) tea.Msg { return prefetchMsg{sid, gen} })
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -362,13 +374,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		if !msg.append {
+			s.budget = m.cfg.Prefetch // a fresh list: reset the background budget
+		}
+		next := m.prefetchTick(s)
 		if m.cur() != s {
-			return m, nil
+			return m, next
+		}
+		if next != nil { // more pages are coming on their own: no status chatter
+			return m, next
 		}
 		if s.nextToken == "" {
 			return m, m.setStatus(fmt.Sprintf("%d loaded. No more pages left!", len(s.rows)))
 		}
 		return m, m.setStatus(fmt.Sprintf("%d loaded. Press n for the next page", len(s.rows)))
+
+	case prefetchMsg:
+		s := m.find(msg.sid)
+		if s == nil || msg.gen != s.gen || s.loading || s.budget <= 0 || s.nextToken == "" {
+			return m, nil // refreshed, gone, or something else is already loading
+		}
+		s.budget--
+		s.loading = true
+		return m, s.load(s.nextToken, true)
 
 	case authDoneMsg:
 		m.authErr = msg.err
@@ -544,7 +572,14 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filter.SetValue(s.search)
 		m.filter.CursorEnd()
 		m.layout()
-		return m, m.filter.Focus()
+		focus := m.filter.Focus()
+		if s.nextToken != "" && m.cfg.SearchPrefetch > 0 { // opening search loads more pages so it sees more
+			s.budget = max(s.budget, m.cfg.SearchPrefetch)
+			if !s.loading {
+				return m, tea.Batch(focus, m.prefetchTick(s))
+			}
+		}
+		return m, focus
 	case "esc":
 		switch {
 		case s.search != "":
@@ -891,7 +926,11 @@ func (m Model) footer(s *screen) string {
 		st = errorStyle
 	case s != nil && s.search != "" && s.nextToken != "": // outranks transient load messages, never errors
 		// search only looks at rows already loaded; say so instead of leaving a "missing" match unexplained
-		st, msg = warnStyle, fmt.Sprintf("Searching the %d rows loaded so far. Press n to load more.", len(s.rows))
+		if s.loading || s.budget > 0 {
+			st, msg = warnStyle, fmt.Sprintf("Searching %d rows, loading more pages...", len(s.rows))
+		} else {
+			st, msg = warnStyle, fmt.Sprintf("Searched %d rows. Press n to load more.", len(s.rows))
+		}
 	case msg == "" && m.authErr != nil:
 		st, msg = warnStyle, authHeadline(m.authErr) // stays until signed in
 		if m.hasProfiles {

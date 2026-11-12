@@ -26,6 +26,12 @@ type Config struct {
 	PemFilesPath string `yaml:"pem_files_path"`
 	DefaultIP    string `yaml:"default_ip_type"` // "private" or "public"
 	PageSize     int32  `yaml:"page_size"`
+	// Prefetch is how many more pages load in the background after the first
+	// one shows (sequentially, PrefetchDelayMs apart); SearchPrefetch is how many
+	// more load when the search box opens, so a search sees more of the data.
+	Prefetch        int `yaml:"prefetch_pages"`
+	SearchPrefetch  int `yaml:"search_prefetch_pages"`
+	PrefetchDelayMs int `yaml:"prefetch_delay_ms"`
 	// View is the screen opened at start: "dashboard" or a resource key of the
 	// chosen cloud. Empty (or unknown) opens the cloud's first resource.
 	View       string `yaml:"view"`
@@ -42,9 +48,10 @@ func Default() Config {
 		Cloud:        "aws",
 		PemFilesPath: "~/.cloudssh/pems",
 		DefaultIP:    "private",
-		PageSize:     50,
-		View:         "",
-		SSHMethod:    SSHMethodSSH,
+		PageSize:     100,
+		Prefetch:     3, SearchPrefetch: 10, PrefetchDelayMs: 250,
+		View:      "",
+		SSHMethod: SSHMethodSSH,
 	}
 }
 
@@ -74,6 +81,7 @@ func Load(path string, explicit bool) (Config, error) {
 	if !ValidSSHMethod(cfg.SSHMethod) {
 		return cfg, fmt.Errorf("ssh_method %q must be %q or %q", cfg.SSHMethod, SSHMethodSSH, SSHMethodTemporaryKey)
 	}
+	cfg.Prefetch, cfg.SearchPrefetch, cfg.PrefetchDelayMs = max(cfg.Prefetch, 0), max(cfg.SearchPrefetch, 0), max(cfg.PrefetchDelayMs, 0)
 	if cfg.PageSize < 5 {
 		cfg.PageSize = 5
 	}

@@ -581,7 +581,7 @@ func TestSearchSaysItOnlySeesLoadedRowsWhileMorePagesExist(t *testing.T) {
 	m = typeKeys(m, "alp")
 	m, _ = send(m, key("enter"))
 	m, _ = send(m, clearStatusMsg{seq: m.statusSeq})
-	if v := m.View(); !strings.Contains(v, "rows loaded so far") || !strings.Contains(v, "load more") {
+	if v := m.View(); !strings.Contains(v, "Searched 3 rows") || !strings.Contains(v, "load more") {
 		t.Fatalf("footer should explain the limit:\n%s", v)
 	}
 	m, _ = send(m, key("esc")) // search cleared: no note
@@ -599,5 +599,69 @@ func TestTitleCountIsALowerBoundOnlyWhileMorePagesExist(t *testing.T) {
 	m = loaded(t, fakeResource{pages: map[string]provider.Page{"": {Rows: rows("a", "b")}}})
 	if v := m.View(); !strings.Contains(v, "Fake[2]") || strings.Contains(v, "Fake[2+]") {
 		t.Fatalf("complete list: exact count\n%s", v)
+	}
+}
+
+func fourPages() fakeResource {
+	pg := func(tok string, names ...string) provider.Page {
+		return provider.Page{Rows: rows(names...), NextToken: tok}
+	}
+	return fakeResource{pages: map[string]provider.Page{
+		"": pg("t1", "a1", "a2"), "t1": pg("t2", "b1", "b2"), "t2": pg("t3", "c1", "c2"), "t3": pg("", "d1", "d2"),
+	}}
+}
+
+func TestFirstPageThenTheNextFewLoadInTheBackground(t *testing.T) {
+	cfg := testCfg()
+	cfg.Prefetch = 2
+	m := newModelWith(cfg, fourPages())
+	m = settle(m, m.Init())
+	if got := len(m.cur().rows); got != 6 || m.cur().nextToken != "t3" { // first page + 2 prefetched
+		t.Fatalf("rows=%d next=%q", got, m.cur().nextToken)
+	}
+	if !strings.Contains(m.View(), "Fake[6+]") {
+		t.Fatal("one page is still missing: the count keeps its plus")
+	}
+	m, cmd := send(m, key("n")) // the rest stays one keypress away
+	m = settle(m, cmd)
+	if len(m.cur().rows) != 8 || strings.Contains(m.View(), "[8+]") {
+		t.Fatalf("rows=%d", len(m.cur().rows))
+	}
+}
+
+func TestOpeningSearchLoadsMorePagesSoItSeesMoreData(t *testing.T) {
+	cfg := testCfg()
+	cfg.SearchPrefetch = 10
+	m := newModelWith(cfg, fourPages())
+	m = settle(m, m.Init())
+	if len(m.cur().rows) != 2 {
+		t.Fatalf("only the first page without search: %d", len(m.cur().rows))
+	}
+	m, cmd := send(m, key("/"))
+	if v := m.View(); !strings.Contains(v, "Fake[2+]") {
+		t.Fatalf("before the pages arrive: %s", v)
+	}
+	m = settle(m, cmd)
+	m = typeKeys(m, "d2")
+	if len(m.cur().view) != 1 || m.cur().nextToken != "" {
+		t.Fatalf("a search for something on the last page now finds it: view=%d next=%q", len(m.cur().view), m.cur().nextToken)
+	}
+}
+
+func TestRefreshDropsBackgroundLoadsOfTheOldList(t *testing.T) {
+	cfg := testCfg()
+	cfg.Prefetch = 3
+	m := newModelWith(cfg, fourPages())
+	first := run(m.Init())
+	stale := first[0] // the first page's result
+	m, _ = send(m, stale)
+	old := m.cur().gen
+	m, _ = send(m, key("r")) // refresh bumps the generation
+	if m.cur().gen == old {
+		t.Fatal("refresh must start a new generation")
+	}
+	_, cmd := send(m, prefetchMsg{sid: m.cur().id, gen: old}) // a tick from the old list arrives late
+	if cmd != nil {
+		t.Fatal("a stale prefetch must do nothing")
 	}
 }

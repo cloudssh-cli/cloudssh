@@ -116,7 +116,7 @@ func (fm *filtersModal) view(w, h int) string {
 	footer := []string{
 		"",
 		hintDescStyle.Render("  enter apply · esc cancel · ↑↓ or tab to move"),
-		hintDescStyle.Render("  a,b means a or b  ·  !a means not a  ·  R in the table resets all filters"),
+		hintDescStyle.Render("  a,b or  ·  &a,b and  ·  !a not  ·  R in the table resets all filters"),
 	}
 	// the dialog needs: border(2) + blank(1) + rows + footer
 	room := max(h-2-1-len(footer), 1)

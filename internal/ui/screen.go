@@ -29,6 +29,8 @@ type screen struct {
 	// focusActive puts the cursor on the active row the next time rows arrive
 	// (the profiles screen: opening it should rest on the profile in use).
 	focusActive bool
+	// budget is how many more pages may still load in the background.
+	budget int
 }
 
 func newScreen(id int, res provider.Resource, filters []provider.Filter, w, h int) *screen {
