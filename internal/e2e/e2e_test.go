@@ -204,7 +204,7 @@ func TestAutoScalingGroupDrillsIntoItsInstances(t *testing.T) {
 	m = press(m, "4")
 	mustContain(t, m, "Auto Scaling · Groups[6]", "batch-workers-asg", "web-prod-asg", "api-prod-asg", "ecs-prod-apps-asg", "Desired Capacity")
 	m = press(typeText(press(m, "/"), "web-prod"), "enter", "enter")
-	mustContain(t, m, "Instances (web-prod-asg)[4]", "web-prod-1", "web-prod-4", "<autoscaling_groups>", "<ec2_instances>")
+	mustContain(t, m, "EC2 · asg web-prod-asg[4]", "web-prod-1", "web-prod-4", "<autoscaling_groups>", "<ec2_instances>")
 	mustNotContain(t, m, "api-prod-1")
 	m = press(m, "esc")
 	mustContain(t, m, "Auto Scaling · Groups[")
@@ -218,7 +218,7 @@ func TestVPCToSubnetsToInstances(t *testing.T) {
 	m = press(m, "enter")
 	mustContain(t, m, "[8]", "prod-public-a", "prod-private-a", "prod-data-b", "Available Ips", "<vpcs>", "<subnets>")
 	m = press(m, "enter") // the subnet with the fewest free addresses has the most machines
-	mustContain(t, m, "<vpcs> <subnets> <ec2_instances>", "Instances (subnet-")
+	mustContain(t, m, "<vpcs> <subnets> <ec2_instances>", "EC2 · subnet subnet-")
 }
 
 func TestECSClusterToServicesToTasksToInstance(t *testing.T) {
@@ -226,9 +226,9 @@ func TestECSClusterToServicesToTasksToInstance(t *testing.T) {
 	m = press(m, "2")
 	mustContain(t, m, "ECS · Clusters[3]", "prod-apps", "prod-fargate", "batch")
 	m = press(m, "enter") // prod-apps runs the most tasks
-	mustContain(t, m, "ECS - prod-apps[5]", "api", "worker", "log-agent", "scheduler", "migrations", "3 running / 3 desired", "<ecs_clusters> <services>")
+	mustContain(t, m, "ECS · prod-apps[5]", "api", "worker", "log-agent", "scheduler", "migrations", "3 running / 3 desired", "<ecs_clusters> <services>")
 	m = press(m, "enter") // api
-	mustContain(t, m, "api (prod-apps)[3]", "RUNNING/RUNNING", "1", "2 GB", "<tasks>")
+	mustContain(t, m, "ECS · prod-apps › api[3]", "RUNNING/RUNNING", "1", "2 GB", "<tasks>")
 	m = press(m, "enter") // an EC2-launched task resolves to its container instance
 	mustContain(t, m, "<ecs_clusters> <services> <tasks> <ec2_instances>", "ecs-prod-apps-")
 }
@@ -250,7 +250,7 @@ func TestEKSClusterToNodeGroupsToNodes(t *testing.T) {
 	m = press(m, "3")
 	mustContain(t, m, "EKS · Clusters[3]", "data-platform", "legacy-eks", "prod-eks", "1.30", "UPDATING")
 	m = press(m, "j", "j", "enter") // prod-eks
-	mustContain(t, m, "EKS - prod-eks[2]", "general", "spot", "1.30.2-20240729", "3/6", "<eks_clusters> <node_groups>")
+	mustContain(t, m, "EKS · prod-eks[2]", "general", "spot", "1.30.2-20240729", "3/6", "<eks_clusters> <node_groups>")
 	m = press(m, "enter") // general
 	mustContain(t, m, "prod-eks-general-node", "<node_groups> <ec2_instances>")
 }

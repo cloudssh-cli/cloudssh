@@ -134,7 +134,7 @@ type ecsServiceRef struct {
 
 func (ecsServices) Key() string                       { return "ecs-services" }
 func (ecsServices) Label() string                     { return "ECS Services" }
-func (r ecsServices) Name() string                    { return "ECS - " + r.cluster }
+func (r ecsServices) Name() string                    { return "ECS · " + r.cluster }
 func (ecsServices) Crumb() string                     { return "services" }
 func (ecsServices) Filters() []provider.FilterDef     { return nil }
 func (ecsServices) DefaultFilters() []provider.Filter { return nil }
@@ -207,11 +207,11 @@ type ecsTasks struct {
 	cluster, service string
 }
 
-type ecsTaskRef struct{ Cluster, ContainerInstanceARN string }
+type ecsTaskRef struct{ Cluster, TaskID, ContainerInstanceARN string }
 
 func (ecsTasks) Key() string                       { return "ecs-tasks" }
 func (ecsTasks) Label() string                     { return "ECS Tasks" }
-func (r ecsTasks) Name() string                    { return r.service + " (" + r.cluster + ")" }
+func (r ecsTasks) Name() string                    { return "ECS · " + r.cluster + " › " + r.service }
 func (ecsTasks) Crumb() string                     { return "tasks" }
 func (ecsTasks) Filters() []provider.FilterDef     { return nil }
 func (ecsTasks) DefaultFilters() []provider.Filter { return nil }
@@ -268,7 +268,7 @@ func ecsTaskRow(cluster string, t types.Task) provider.Row {
 			started, ciShort, orDash(string(t.LaunchType)),
 			humanCPU(awssdk.ToString(t.Cpu)), humanMemory(awssdk.ToString(t.Memory)),
 		},
-		Ref: ecsTaskRef{Cluster: cluster, ContainerInstanceARN: ci},
+		Ref: ecsTaskRef{Cluster: cluster, TaskID: taskID[:min(8, len(taskID))], ContainerInstanceARN: ci},
 	}
 }
 
@@ -324,7 +324,7 @@ func (r ecsTasks) Drill(ctx context.Context, row provider.Row) (provider.Drill, 
 	}
 	id := awssdk.ToString(out.ContainerInstances[0].Ec2InstanceId)
 	return provider.Drill{
-		Resource: &instances{p: r.p, sub: id + " · " + r.service + " (" + r.cluster + ")"},
+		Resource: &instances{p: r.p, sub: "task " + ref.TaskID},
 		Filters:  []provider.Filter{{Key: "instance-id", Value: id}},
 	}, nil
 }

@@ -102,7 +102,7 @@ func (subnets) Key() string   { return "subnets" }
 func (subnets) Label() string { return "Subnets" }
 func (r subnets) Name() string {
 	if r.vpc != "" {
-		return "VPC - " + r.vpc
+		return "VPC · " + r.vpc
 	}
 	return "Subnets"
 }
@@ -158,7 +158,7 @@ func (r subnets) Drill(_ context.Context, row provider.Row) (provider.Drill, err
 		return provider.Drill{}, fmt.Errorf("no subnet selected")
 	}
 	return provider.Drill{
-		Resource: &instances{p: r.p, sub: ref.ID},
+		Resource: &instances{p: r.p, sub: "subnet " + ref.ID},
 		Filters:  []provider.Filter{{Key: "subnet-id", Value: ref.ID}},
 	}, nil
 }

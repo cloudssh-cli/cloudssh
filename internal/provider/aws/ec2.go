@@ -21,7 +21,7 @@ func (instances) Key() string   { return "ec2" }
 func (instances) Label() string { return "EC2 Instances" }
 func (i instances) Name() string {
 	if i.sub != "" {
-		return "Instances (" + i.sub + ")" // a drilled list says where it came from
+		return "EC2 · " + i.sub // a drilled list says where it came from
 	}
 	return "EC2 · Instances"
 }

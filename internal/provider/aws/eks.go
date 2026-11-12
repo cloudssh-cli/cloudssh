@@ -111,7 +111,7 @@ type nodeGroupRef struct {
 
 func (eksNodeGroups) Key() string                       { return "eks-nodegroups" }
 func (eksNodeGroups) Label() string                     { return "EKS Node Groups" }
-func (r eksNodeGroups) Name() string                    { return "EKS - " + r.cluster }
+func (r eksNodeGroups) Name() string                    { return "EKS · " + r.cluster }
 func (eksNodeGroups) Crumb() string                     { return "node_groups" }
 func (eksNodeGroups) Filters() []provider.FilterDef     { return nil }
 func (eksNodeGroups) DefaultFilters() []provider.Filter { return nil }
@@ -205,7 +205,7 @@ func (r eksNodeGroups) Drill(ctx context.Context, row provider.Row) (provider.Dr
 		return provider.Drill{}, errors.New("node group has no auto scaling group")
 	}
 	return provider.Drill{
-		Resource: &instances{p: r.p, sub: ref.Name + " · " + ref.ASG},
+		Resource: &instances{p: r.p, sub: "node group " + ref.Name},
 		Filters:  []provider.Filter{{Key: "auto-scaling-group", Value: ref.ASG}},
 	}, nil
 }
