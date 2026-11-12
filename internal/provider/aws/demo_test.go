@@ -46,13 +46,13 @@ func TestOpenReturnsTheDemoWhenAsked(t *testing.T) {
 		t.Fatal("Open(Demo) must return a Demoer")
 	}
 	a := p.(provider.Authenticator)
-	if a.AuthError() != nil || a.Profile() != "acme-prod" || a.Access() != "SSO (acme-prod)" {
+	if a.AuthError() != nil || a.Profile() != "cloudssh-prod" || a.Access() != "SSO (cloudssh-prod)" {
 		t.Fatalf("starts as the first demo account: %v %q %q", a.AuthError(), a.Profile(), a.Access())
 	}
 	// an unknown demo profile shows the friendly signed-out state, not a crash
 	p, _ = Open(context.Background(), provider.Options{Demo: true, Profile: "nope", PageSize: 8})
 	a = p.(provider.Authenticator)
-	if ae := a.AuthError(); ae == nil || !strings.Contains(ae.Error(), `no demo profile called "nope"`) || !strings.Contains(ae.Error(), "acme-prod") {
+	if ae := a.AuthError(); ae == nil || !strings.Contains(ae.Error(), `no demo profile called "nope"`) || !strings.Contains(ae.Error(), "cloudssh-prod") {
 		t.Fatalf("AuthError: %v", ae)
 	}
 	if len(a.Profiles()) != 3 {
@@ -83,11 +83,11 @@ func TestSwitchingDemoProfilesChangesTheData(t *testing.T) {
 	if asgCount() == 0 {
 		t.Fatal("the prod demo account has auto scaling groups")
 	}
-	if err := p.UseProfile(ctx, "sandbox"); err != nil {
+	if err := p.UseProfile(ctx, "cloudssh-sandbox"); err != nil {
 		t.Fatal(err)
 	}
-	if asgCount() != 0 || p.Region() != "us-west-2" || p.Access() != "access keys (sandbox)" {
-		t.Fatalf("sandbox should be tiny and elsewhere: asgs=%d region=%s access=%q", asgCount(), p.Region(), p.Access())
+	if asgCount() != 0 || p.Region() != "us-west-2" || p.Access() != "access keys (cloudssh-sandbox)" {
+		t.Fatalf("cloudssh-sandbox should be tiny and elsewhere: asgs=%d region=%s access=%q", asgCount(), p.Region(), p.Access())
 	}
 }
 

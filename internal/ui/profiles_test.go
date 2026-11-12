@@ -20,6 +20,7 @@ type fakeAuthn struct {
 	profile  string
 	access   string
 	region   string
+	identity provider.Identity
 	profiles []provider.ProfileInfo
 	fail     map[string]error
 	used     []string
@@ -35,6 +36,7 @@ func (f *fakeAuthn) Access() string {
 	return f.access
 }
 func (f *fakeAuthn) Region() string                   { return f.region }
+func (f *fakeAuthn) Identity() provider.Identity      { return f.identity }
 func (f *fakeAuthn) Profile() string                  { f.mu.Lock(); defer f.mu.Unlock(); return f.profile }
 func (f *fakeAuthn) Profiles() []provider.ProfileInfo { return f.profiles }
 func (f *fakeAuthn) UseProfile(_ context.Context, name string) error {
@@ -315,5 +317,26 @@ func TestOpeningProfilesRestsTheCursorOnTheActiveOne(t *testing.T) {
 	m = settle(m, cmd)
 	if len(f.used) != 0 || m.mode != 1 {
 		t.Fatalf("enter on the resting cursor must just go back: used=%v mode=%d", f.used, m.mode)
+	}
+}
+
+func TestHeaderShowsAccountAliasAndWhoIsSignedIn(t *testing.T) {
+	f := &fakeAuthn{profile: "prod", access: "SSO (prod)", region: "us-east-1", profiles: twoProfs,
+		identity: provider.Identity{Account: "123456789012", Alias: "northwind", Principal: "role Admin"}}
+	m := signIn(t, f, &recorder{})
+	v := m.View()
+	for _, want := range []string{"Account: northwind (123456789012)", "Auth: SSO (prod) · role Admin"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("header lacks %q:\n%s", want, v)
+		}
+	}
+	f.identity = provider.Identity{Account: "123456789012"} // no alias, no principal known
+	m = signIn(t, f, &recorder{})
+	if v := m.View(); !strings.Contains(v, "Account: 123456789012") || strings.Contains(v, "Auth: SSO (prod) ·") {
+		t.Errorf("without an alias or principal the header stays plain:\n%s", v)
+	}
+	f2 := &fakeAuthn{err: errNoCreds}
+	if v := signIn(t, f2, &recorder{}).View(); strings.Contains(v, "Account:") {
+		t.Error("no account line while signed out")
 	}
 }

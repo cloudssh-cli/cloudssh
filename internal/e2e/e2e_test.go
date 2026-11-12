@@ -131,7 +131,7 @@ func mustNotContain(t *testing.T, m ui.Model, nots ...string) {
 
 func TestDemoOpensOnRunningInstancesAndSaysItIsADemo(t *testing.T) {
 	m := demo(t)
-	mustContain(t, m, "Cloud: aws · us-east-1 · demo", "Auth: SSO (acme-prod)", "aws · us-east-1",
+	mustContain(t, m, "Cloud: aws · us-east-1 · demo", "Account: cloudssh-production (123456789012)", "Auth: SSO (cloudssh-prod) · role AdministratorAccess", "aws · us-east-1",
 		"Instances[", "api-prod-1", "bastion-01", "running", "Pages: 1+", "<ec2_instances>")
 	mustNotContain(t, m, "postgres-replica", "old-build-agent") // stopped and terminated hide behind the default state filter
 }
@@ -252,14 +252,14 @@ func TestEKSClusterToNodeGroupsToNodes(t *testing.T) {
 func TestSwitchingProfilesChangesTheWholeApp(t *testing.T) {
 	m := demo(t)
 	m = press(m, "p")
-	mustContain(t, m, "Profiles[3]", "acme-prod", "acme-staging", "sandbox", "●", "SSO", "access keys", "123456789012 AdministratorAccess")
-	m = press(m, "j", "j", "enter") // sandbox
-	mustContain(t, m, "Auth: access keys (sandbox)", "aws · us-west-2", "playground")
+	mustContain(t, m, "Profiles[3]", "cloudssh-prod", "cloudssh-staging", "cloudssh-sandbox", "●", "SSO", "access keys", "123456789012 AdministratorAccess")
+	m = press(m, "j", "enter") // cloudssh-sandbox (profiles sort by name: prod, sandbox, staging)
+	mustContain(t, m, "Auth: access keys (cloudssh-sandbox)", "aws · us-west-2", "playground")
 	mustNotContain(t, m, "bastion-01")
 	m = press(m, "4")
-	mustContain(t, m, "No auto scaling groups found!")         // the sandbox account is tiny: the empty state
-	m = press(m, "p", "k", "k", "enter")                       // the cursor rests on the active profile (sandbox); two up is acme-prod
-	mustContain(t, m, "Auth: SSO (acme-prod)", "web-prod-asg") // back on the screen we came from, now for acme-prod
+	mustContain(t, m, "No auto scaling groups found!")             // the cloudssh-sandbox account is tiny: the empty state
+	m = press(m, "p", "k", "k", "enter")                           // the cursor rests on the active profile (cloudssh-sandbox); two up is cloudssh-prod
+	mustContain(t, m, "Auth: SSO (cloudssh-prod)", "web-prod-asg") // back on the screen we came from, now for cloudssh-prod
 }
 
 func TestUnknownDemoProfileStartsSignedOutAndRecovers(t *testing.T) {
@@ -268,9 +268,9 @@ func TestUnknownDemoProfileStartsSignedOutAndRecovers(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := start(t, p, 150, 40)
-	mustContain(t, m, "Auth: not signed in", `There is no demo profile called "nope".`, "acme-prod", "Profiles[3]", "Use profile")
-	m = press(m, "enter") // acme-prod
-	mustContain(t, m, "Auth: SSO (acme-prod)", "bastion-01")
+	mustContain(t, m, "Auth: not signed in", `There is no demo profile called "nope".`, "cloudssh-prod", "Profiles[3]", "Use profile")
+	m = press(m, "enter") // cloudssh-prod
+	mustContain(t, m, "Auth: SSO (cloudssh-prod)", "bastion-01")
 }
 
 func TestEveryDemoScreenFitsTheTerminal(t *testing.T) {

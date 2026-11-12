@@ -137,6 +137,14 @@ type ProfileInfo struct {
 	Detail string // e.g. the SSO account/role or the role ARN
 }
 
+// Identity says whose account the app is acting in. Every field is optional:
+// providers fill what the cloud can tell them.
+type Identity struct {
+	Account   string // account / subscription / project id
+	Alias     string // friendly account name, when the cloud has one
+	Principal string // who is signed in: "role AdministratorAccess", "user alice", "root"
+}
+
 // Authenticator is optionally implemented by a Provider whose credentials or
 // profile can be chosen at runtime. The provider starts even when it cannot
 // sign in; the UI then explains the problem and offers the way forward.
@@ -150,6 +158,8 @@ type Authenticator interface {
 	Access() string
 	// Region is the region in use, if known.
 	Region() string
+	// Identity is the account and principal behind the credentials (zero when unknown).
+	Identity() Identity
 	// Profile is the profile in use ("" when none, e.g. environment keys).
 	Profile() string
 	// Profiles lists the profiles configured on this machine (may be empty).

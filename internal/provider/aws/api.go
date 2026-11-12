@@ -7,6 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 // The slices of each AWS SDK client the provider uses. Real clients satisfy
@@ -42,7 +44,17 @@ type eksAPI interface {
 	DescribeNodegroup(ctx context.Context, in *eks.DescribeNodegroupInput, opts ...func(*eks.Options)) (*eks.DescribeNodegroupOutput, error)
 }
 
+type stsAPI interface {
+	GetCallerIdentity(ctx context.Context, in *sts.GetCallerIdentityInput, opts ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
+type iamAPI interface {
+	ListAccountAliases(ctx context.Context, in *iam.ListAccountAliasesInput, opts ...func(*iam.Options)) (*iam.ListAccountAliasesOutput, error)
+}
+
 var (
+	_ stsAPI = (*sts.Client)(nil)
+	_ iamAPI = (*iam.Client)(nil)
 	_ ec2API = (*ec2.Client)(nil)
 	_ asgAPI = (*autoscaling.Client)(nil)
 	_ ecsAPI = (*ecs.Client)(nil)

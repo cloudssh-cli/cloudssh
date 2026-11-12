@@ -729,7 +729,19 @@ func (m Model) infos() []info {
 	case m.auth != nil && m.authErr != nil:
 		out = append(out, info{"Auth", "not signed in"})
 	case m.auth != nil:
-		out = append(out, info{"Auth", m.auth.Access()})
+		id := m.auth.Identity()
+		if id.Account != "" { // which account we are acting in, by its friendly name when it has one
+			acct := id.Account
+			if id.Alias != "" {
+				acct = id.Alias + " (" + id.Account + ")"
+			}
+			out = append(out, info{"Account", acct})
+		}
+		access := m.auth.Access()
+		if id.Principal != "" {
+			access += " · " + id.Principal
+		}
+		out = append(out, info{"Auth", access})
 	case m.cfg.Profile != "":
 		out = append(out, info{"Profile", m.cfg.Profile})
 	}

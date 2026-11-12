@@ -38,16 +38,18 @@ func NewDemo(pageSize int32) *Provider {
 func (p *Provider) Demo() bool { return p.demo != nil }
 
 func (d *demoState) clients(a *demoAccount) *clients {
-	return &clients{ec2: &demoEC2{a}, asg: &demoASG{a}, ecs: &demoECS{a}, eks: &demoEKS{a}, eic: &demoEIC{a}}
+	return &clients{ec2: &demoEC2{a}, asg: &demoASG{a}, ecs: &demoECS{a}, eks: &demoEKS{a}, eic: &demoEIC{a}, sts: &demoSTS{a}, iam: &demoIAM{a}}
 }
 
 // useDemo switches to the demo account named profile.
 func (p *Provider) useDemo(profile string) error {
 	for _, a := range p.demo.accounts {
 		if a.profile.Name == profile {
+			cl := p.demo.clients(a)
+			id := resolveIdentity(context.Background(), cl) // the same lookup the real provider runs, against the fake STS/IAM
 			p.mu.Lock()
 			defer p.mu.Unlock()
-			p.profileInUse, p.cl, p.authErr, p.region, p.access = profile, p.demo.clients(a), nil, a.region, a.access
+			p.profileInUse, p.cl, p.authErr, p.region, p.access, p.identity = profile, cl, nil, a.region, a.access, id
 			return nil
 		}
 	}
@@ -57,7 +59,7 @@ func (p *Provider) useDemo(profile string) error {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.profileInUse, p.cl, p.authErr, p.region, p.access = profile, nil, err, "", "not signed in"
+	p.profileInUse, p.cl, p.authErr, p.region, p.access, p.identity = profile, nil, err, "", "not signed in", provider.Identity{}
 	return err
 }
 

@@ -18,6 +18,8 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
 )
 
@@ -526,4 +528,23 @@ var (
 	_ asgAPI          = (*demoASG)(nil)
 	_ instanceConnect = (*demoEIC)(nil)
 	_                 = ekstypes.ClusterStatusActive
+)
+
+// ---- STS / IAM (who am I) ----
+
+type demoSTS struct{ a *demoAccount }
+
+func (d *demoSTS) GetCallerIdentity(context.Context, *sts.GetCallerIdentityInput, ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	return &sts.GetCallerIdentityOutput{Account: awssdk.String(d.a.accounts), Arn: awssdk.String(d.a.caller), UserId: awssdk.String("AIDA" + strings.ToUpper(d.a.accounts))}, nil
+}
+
+type demoIAM struct{ a *demoAccount }
+
+func (d *demoIAM) ListAccountAliases(context.Context, *iam.ListAccountAliasesInput, ...func(*iam.Options)) (*iam.ListAccountAliasesOutput, error) {
+	return &iam.ListAccountAliasesOutput{AccountAliases: []string{d.a.alias}}, nil
+}
+
+var (
+	_ stsAPI = (*demoSTS)(nil)
+	_ iamAPI = (*demoIAM)(nil)
 )

@@ -365,6 +365,9 @@ func (w *walker) checkAuthAndHosts(p provider.Provider) {
 	if a.Access() == "" || a.Region() == "" {
 		t.Errorf("Authenticator: Access=%q Region=%q must both be set when signed in", a.Access(), a.Region())
 	}
+	if d, isDemo := p.(provider.Demoer); isDemo && d.Demo() && a.Identity().Account == "" {
+		t.Errorf("a demo provider should report an Identity (account, alias, principal) so the header can show it")
+	}
 	profiles := a.Profiles()
 	if d, isDemo := p.(provider.Demoer); isDemo && d.Demo() && len(profiles) == 0 {
 		t.Errorf("%s", "a demo provider should offer sample profiles so switching can be shown")

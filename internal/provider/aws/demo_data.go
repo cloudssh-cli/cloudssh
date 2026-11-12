@@ -32,6 +32,8 @@ type demoAccount struct {
 	access   string
 	region   string
 	accounts string // 12-digit account id
+	alias    string // account alias (IAM)
+	caller   string // ARN of the pretend signed-in principal
 
 	vpcs      []ec2types.Vpc
 	subnets   []ec2types.Subnet
@@ -369,8 +371,10 @@ func buildDemoAccounts(now time.Time) []*demoAccount {
 
 func demoProd(now time.Time) *demoAccount {
 	b := newBuilder(1, now, "us-east-1",
-		provider.ProfileInfo{Name: "acme-prod", Kind: "SSO", Region: "us-east-1", Detail: "123456789012 AdministratorAccess"},
-		"SSO (acme-prod)", "123456789012")
+		provider.ProfileInfo{Name: "cloudssh-prod", Kind: "SSO", Region: "us-east-1", Detail: "123456789012 AdministratorAccess"},
+		"SSO (cloudssh-prod)", "123456789012")
+	b.acc.alias = "cloudssh-production"
+	b.acc.caller = "arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_AdministratorAccess_8f1c2d3e4a5b6c7d/sso-user"
 	al2023 := b.image("al2023", "Amazon Linux 2023 AMI 2023.5.20240805.0 x86_64 HVM kernel-6.1")
 	ubuntu := b.image("ubuntu", "Canonical, Ubuntu, 22.04 LTS, amd64 jammy image build on 2024-07-23")
 	debianARM := b.image("debian", "Debian 12 (20240717-1811) arm64")
@@ -460,8 +464,10 @@ func demoProd(now time.Time) *demoAccount {
 
 func demoStaging(now time.Time) *demoAccount {
 	b := newBuilder(2, now, "eu-west-1",
-		provider.ProfileInfo{Name: "acme-staging", Kind: "SSO", Region: "eu-west-1", Detail: "210987654321 PowerUserAccess"},
-		"SSO (acme-staging)", "210987654321")
+		provider.ProfileInfo{Name: "cloudssh-staging", Kind: "SSO", Region: "eu-west-1", Detail: "210987654321 PowerUserAccess"},
+		"SSO (cloudssh-staging)", "210987654321")
+	b.acc.alias = "cloudssh-staging"
+	b.acc.caller = "arn:aws:sts::210987654321:assumed-role/AWSReservedSSO_PowerUserAccess_1a2b3c4d5e6f7a8b/sso-user"
 	ubuntu := b.image("ubuntu", "Canonical, Ubuntu, 24.04 LTS, amd64 noble image build on 2024-07-01")
 	al2023 := b.image("al2023", "Amazon Linux 2023 AMI 2023.5.20240805.0 x86_64 HVM kernel-6.1")
 
@@ -492,14 +498,16 @@ func demoStaging(now time.Time) *demoAccount {
 
 func demoSandbox(now time.Time) *demoAccount {
 	b := newBuilder(3, now, "us-west-2",
-		provider.ProfileInfo{Name: "sandbox", Kind: "access keys", Region: "us-west-2"},
-		"access keys (sandbox)", "555566667777")
+		provider.ProfileInfo{Name: "cloudssh-sandbox", Kind: "access keys", Region: "us-west-2"},
+		"access keys (cloudssh-sandbox)", "555566667777")
+	b.acc.alias = "cloudssh-sandbox"
+	b.acc.caller = "arn:aws:iam::555566667777:user/deploy-bot"
 	al2023 := b.image("al2023", "Amazon Linux 2023 AMI 2023.5.20240805.0 x86_64 HVM kernel-6.1")
 	def := b.vpc("", "172.31.0.0/16", true)
 	b.sub("default-a", "", def, "172.31.0.0/20", 0, true)
 	b.sub("default-b", "", def, "172.31.16.0/20", 1, true)
-	b.instance(inst{name: "playground", typ: "t3.micro", subnet: "default-a", image: al2023, key: "sandbox-key", public: true})
-	b.instance(inst{name: "scratch", typ: "t3.nano", subnet: "default-b", image: al2023, key: "sandbox-key", state: ec2types.InstanceStateNameStopped})
+	b.instance(inst{name: "playground", typ: "t3.micro", subnet: "default-a", image: al2023, key: "cloudssh-sandbox-key", public: true})
+	b.instance(inst{name: "scratch", typ: "t3.nano", subnet: "default-b", image: al2023, key: "cloudssh-sandbox-key", state: ec2types.InstanceStateNameStopped})
 	b.finishSubnets()
 	return b.acc // no ASGs, ECS or EKS: the empty states
 }

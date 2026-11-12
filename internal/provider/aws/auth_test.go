@@ -85,6 +85,9 @@ func isolateAWS(t *testing.T) (configPath, credsPath string) {
 			t.Fatal(err)
 		}
 	}
+	old := identityLookup
+	identityLookup = func(context.Context, *clients) provider.Identity { return provider.Identity{} } // never reach the network
+	t.Cleanup(func() { identityLookup = old })
 	t.Setenv("AWS_CONFIG_FILE", configPath)
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", credsPath)
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")

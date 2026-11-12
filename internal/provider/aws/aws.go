@@ -16,6 +16,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2instanceconnect"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
@@ -32,6 +34,8 @@ type clients struct {
 	ecs ecsAPI
 	eks eksAPI
 	eic instanceConnect
+	sts stsAPI
+	iam iamAPI
 }
 
 type Provider struct {
@@ -39,12 +43,13 @@ type Provider struct {
 	regionFlag   string // --region / config, wins over the profile's region
 	profileInUse string
 
-	mu      sync.RWMutex
-	cl      *clients
-	authErr error
-	region  string
-	access  string // header text, e.g. "SSO (prod)"
-	demo    *demoState
+	mu       sync.RWMutex
+	cl       *clients
+	authErr  error
+	region   string
+	access   string // header text, e.g. "SSO (prod)"
+	identity provider.Identity
+	demo     *demoState
 }
 
 var (
@@ -62,7 +67,7 @@ func New(ctx context.Context, profile, region string, pageSize int32) (*Provider
 
 // buildClients loads the profile, verifies its credentials and region, and
 // creates the service clients.
-func buildClients(ctx context.Context, profile, regionFlag string) (*clients, string, string, error) {
+func buildClients(ctx context.Context, profile, regionFlag string) (*clients, string, string, provider.Identity, error) {
 	var opts []func(*awsconfig.LoadOptions) error
 	if profile != "" {
 		opts = append(opts, awsconfig.WithSharedConfigProfile(profile))
@@ -72,24 +77,27 @@ func buildClients(ctx context.Context, profile, regionFlag string) (*clients, st
 	}
 	cfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
-		return nil, "", "", explainAuthError(err, profile)
+		return nil, "", "", provider.Identity{}, explainAuthError(err, profile)
 	}
 	cctx, cancel := context.WithTimeout(ctx, credentialsTimeout)
 	defer cancel()
 	creds, err := cfg.Credentials.Retrieve(cctx)
 	if err != nil {
-		return nil, "", "", explainAuthError(err, profile)
+		return nil, "", "", provider.Identity{}, explainAuthError(err, profile)
 	}
 	if cfg.Region == "" {
-		return nil, "", "", noRegionError(profile)
+		return nil, "", "", provider.Identity{}, noRegionError(profile)
 	}
-	return &clients{
+	cl := &clients{
 		ec2: ec2.NewFromConfig(cfg),
 		asg: autoscaling.NewFromConfig(cfg),
 		ecs: ecs.NewFromConfig(cfg),
 		eks: eks.NewFromConfig(cfg),
 		eic: ec2instanceconnect.NewFromConfig(cfg),
-	}, cfg.Region, describeAccess(profile, creds.Source), nil
+		sts: sts.NewFromConfig(cfg),
+		iam: iam.NewFromConfig(cfg),
+	}
+	return cl, cfg.Region, describeAccess(profile, creds.Source), identityLookup(ctx, cl), nil
 }
 
 // UseProfile (re)connects with profile and records the outcome.
@@ -97,15 +105,15 @@ func (p *Provider) UseProfile(ctx context.Context, profile string) error {
 	if p.demo != nil {
 		return p.useDemo(profile)
 	}
-	cl, region, access, err := buildClients(ctx, profile, p.regionFlag)
+	cl, region, access, id, err := buildClients(ctx, profile, p.regionFlag)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.profileInUse = profile
 	if err != nil {
-		p.cl, p.authErr, p.region, p.access = nil, err, "", "not signed in"
+		p.cl, p.authErr, p.region, p.access, p.identity = nil, err, "", "not signed in", provider.Identity{}
 		return err
 	}
-	p.cl, p.authErr, p.region, p.access = cl, nil, region, access
+	p.cl, p.authErr, p.region, p.access, p.identity = cl, nil, region, access, id
 	return nil
 }
 
