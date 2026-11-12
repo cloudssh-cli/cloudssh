@@ -10,21 +10,43 @@ import (
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
 
-type instances struct{ p *Provider }
+// instances lists EC2 instances. sub, when set, is shown in the title
+// (e.g. the ASG the list was drilled from).
+type instances struct {
+	p   *Provider
+	sub string
+}
 
-func (instances) Name() string { return "EC2" }
+func (instances) Key() string   { return "ec2" }
+func (instances) Label() string { return "EC2 Instances" }
+func (i instances) Name() string {
+	if i.sub != "" {
+		return "Instances(" + i.sub + ")"
+	}
+	return "Instances"
+}
+func (instances) Crumb() string { return "ec2_instances" }
 
 func (instances) Columns() []provider.Column {
 	return []provider.Column{
-		{Title: "ID"}, {Title: "Name"}, {Title: "Type"}, {Title: "AZ"},
-		{Title: "Private IP"}, {Title: "Public IP"}, {Title: "ASG"}, {Title: "State"},
+		{Title: "ID"}, {Title: "Name", DefaultSort: "asc"}, {Title: "Type"}, {Title: "AZ"},
+		{Title: "Private IP"}, {Title: "Public IP"}, {Title: "ASG Name"}, {Title: "State"},
 	}
 }
 
-func (r *instances) List(ctx context.Context, nextToken string) (provider.Page, error) {
-	in := &ec2.DescribeInstancesInput{MaxResults: awssdk.Int32(r.p.pageSize)}
-	if nextToken != "" {
-		in.NextToken = awssdk.String(nextToken)
+func (instances) Filters() []provider.FilterDef { return defsOf(ec2Specs) }
+
+func (instances) DefaultFilters() []provider.Filter {
+	return []provider.Filter{{Key: "state", Value: "running"}}
+}
+
+func (r instances) List(ctx context.Context, q provider.Query) (provider.Page, error) {
+	in := &ec2.DescribeInstancesInput{
+		MaxResults: awssdk.Int32(r.p.size(1000)),
+		Filters:    buildFilters(ec2Specs, q.Filters),
+	}
+	if q.Token != "" {
+		in.NextToken = awssdk.String(q.Token)
 	}
 	out, err := r.p.ec2.DescribeInstances(ctx, in)
 	if err != nil {
@@ -61,7 +83,7 @@ func instanceRow(i types.Instance) provider.Row {
 	return provider.Row{
 		Cells: []string{id, name, string(i.InstanceType), az, priv, pub, asg, state},
 		Ref: provider.Host{
-			ID: id, PrivateIP: priv, PublicIP: pub,
+			ID: id, Name: name, PrivateIP: priv, PublicIP: pub,
 			KeyName: awssdk.ToString(i.KeyName), ImageID: awssdk.ToString(i.ImageId),
 		},
 	}

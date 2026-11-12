@@ -8,13 +8,19 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/eks"
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
 
 type Provider struct {
 	ec2      *ec2.Client
+	asg      *autoscaling.Client
+	ecs      *ecs.Client
+	eks      *eks.Client
 	pageSize int32
 }
 
@@ -31,14 +37,30 @@ func New(ctx context.Context, profile, region string, pageSize int32) (*Provider
 	if err != nil {
 		return nil, fmt.Errorf("load aws config: %w", err)
 	}
-	return &Provider{ec2: ec2.NewFromConfig(cfg), pageSize: pageSize}, nil
+	return &Provider{
+		ec2:      ec2.NewFromConfig(cfg),
+		asg:      autoscaling.NewFromConfig(cfg),
+		ecs:      ecs.NewFromConfig(cfg),
+		eks:      eks.NewFromConfig(cfg),
+		pageSize: pageSize,
+	}, nil
 }
 
 func (p *Provider) Name() string { return "aws" }
 
+// Resources returns the top-level modes in shortcut order: 1=ec2 2=ecs 3=eks 4=asg 5=vpc.
 func (p *Provider) Resources() []provider.Resource {
-	return []provider.Resource{&instances{p: p}}
+	return []provider.Resource{
+		&instances{p: p},
+		&ecsClusters{p: p},
+		&eksClusters{p: p},
+		&asgs{p: p},
+		&vpcs{p: p},
+	}
 }
+
+// size caps the configured page size to an API's maximum.
+func (p *Provider) size(limit int32) int32 { return min(p.pageSize, limit) }
 
 // ResolveHost fills Host.DefaultUser from the instance's AMI description.
 func (p *Provider) ResolveHost(ctx context.Context, h provider.Host) (provider.Host, error) {
@@ -67,17 +89,11 @@ func UserForImage(description string) string {
 		return "ubuntu"
 	case strings.Contains(d, "debian"):
 		return "admin"
-	case strings.Contains(d, "centos"):
-		return "centos"
-	case strings.Contains(d, "fedora"):
-		return "fedora"
 	case strings.Contains(d, "rocky linux"):
 		return "rocky"
 	case strings.Contains(d, "bitnami"):
 		return "bitnami"
-	case strings.Contains(d, "rhel"), strings.Contains(d, "suse"):
-		return "root"
-	default: // amazon linux, oracle, unknown
+	default: // amazon linux, oracle, centos, fedora, rhel, suse, unknown (root is refused on RHEL/SUSE AMIs)
 		return "ec2-user"
 	}
 }
