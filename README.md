@@ -78,7 +78,7 @@ cloudssh does not manage tunnels. If you already run one for an instance behind 
 aws ec2-instance-connect open-tunnel --instance-id i-0abc123 --local-port 2222
 ```
 
-the SSH dialog notices it (it looks for `open-tunnel --local-port` processes that lead to the selected instance's SSH port) and offers a **Route: Running tunnel** choice (`tab` to it, `→` to switch). It is never chosen automatically, and the option does not appear when no matching tunnel runs. It combines with `ctrl+t` (temporary key). The host key is stored under the instance id, so `known_hosts` stays valid whichever local port you pick.
+the SSH dialog notices it (it looks for `open-tunnel --local-port` processes that lead to the selected instance's SSH port) and offers a **Route: Running tunnel** choice (`tab` to it, `→` to switch). It is never chosen automatically, and the option does not appear when no matching tunnel runs. It combines with the Method choice (temporary key). The host key is stored under the instance id, so `known_hosts` stays valid whichever local port you pick.
 
 Detection reads your local process list, so run the cloudssh binary directly (not `make run`, where the container cannot see your tunnel or `127.0.0.1`). Not available on Windows.
 
