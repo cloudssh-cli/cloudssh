@@ -598,7 +598,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.setStatus("error: host has no reachable IP address")
 		}
 		auth, _ := m.prov.(provider.Authorizer)
-		sm, cmd := newSSHModal(msg.host, m.cfg, auth, msg.tunnels)
+		sm, cmd := newSSHModal(msg.host, m.cfg, auth, msg.tunnels, !m.demo)
 		m.modal = sm
 		return m, cmd
 

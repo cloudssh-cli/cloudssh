@@ -108,7 +108,7 @@ Config (`~/.config/cloudssh/config.yaml`, `$XDG_CONFIG_HOME/cloudssh/config.yaml
 cloud: aws
 profile: default
 region: us-east-1
-pem_files_path: ~/.cloudssh/pems   # <key-pair-name>.pem is passed with -i (alone, IdentitiesOnly) when present; a missing or too-open (not 600) key is flagged in the ssh dialog
+pem_files_path: ~/.cloudssh/pems   # <key-pair-name>.pem is passed with -i (alone, IdentitiesOnly) when present; a too-open (not 600) key is flagged in the ssh dialog; when the .pem is missing the dialog asks for a key file and will not connect without one (or use the temporary-key method)
 default_ip_type: private           # or public
 ssh_method: ssh                    # or temporary-key (a short-lived key pushed through the cloud, e.g. EC2 Instance Connect)
 page_size: 100                     # rows per page (AWS allows up to 1000 for EC2/VPC, 100 for Auto Scaling; EKS is capped lower)

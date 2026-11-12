@@ -562,3 +562,74 @@ func TestDemoModeIsMarkedAndNeverStartsRealSSH(t *testing.T) {
 		t.Error("only demo sessions are marked")
 	}
 }
+
+func keyModel(t *testing.T, pemDir string, demo bool) Model {
+	t.Helper()
+	cfg := testCfg()
+	cfg.PemFilesPath = pemDir
+	var p provider.Provider = &fakeAuthProvider{fakeProvider: fakeProvider{res: []provider.Resource{threeRows()}}}
+	if demo {
+		p = demoProvider{fakeProvider{res: []provider.Resource{threeRows()}}}
+	}
+	m := sized(New(cfg, p), 120, 30)
+	m = settle(m, m.Init())
+	m, _ = send(m, resolvedMsg{host: provider.Host{ID: "i-1", PrivateIP: "10.0.0.1", DefaultUser: "ubuntu", KeyName: "prod"}})
+	return m
+}
+
+func TestMissingPemBlocksSSHUntilAKeyFileIsChosen(t *testing.T) {
+	dir := t.TempDir()
+	m := keyModel(t, dir, false)
+	sm := m.modal.(*sshModal)
+	if !sm.needKey || !strings.Contains(m.View(), "Key file") || !strings.Contains(m.View(), "prod.pem not found") {
+		t.Fatalf("a missing pem must be explained with a Key file field:\n%s", m.View())
+	}
+	m, _ = send(m, key("enter")) // no key: refused, dialog stays, cursor goes to the Key field
+	if m.modal == nil {
+		t.Fatal("the dialog must stay open")
+	}
+	sm = m.modal.(*sshModal)
+	if sm.current() != fieldKey || !strings.Contains(m.View(), "enter a key file below") {
+		t.Fatalf("must say what to do and focus the Key field:\n%s", m.View())
+	}
+
+	m = typeKeys(m, filepath.Join(dir, "nope.pem")) // a path that does not exist
+	m, _ = send(m, key("enter"))
+	if m.modal == nil || !strings.Contains(m.View(), "no such file") {
+		t.Fatalf("a bad path must be refused:\n%s", m.View())
+	}
+
+	pem := filepath.Join(dir, "mine.pem")
+	if err := os.WriteFile(pem, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m = typeKeys(m, "") // keep the field; replace its value
+	m.modal.(*sshModal).keyFile.SetValue(pem)
+	tgt, err := m.modal.(*sshModal).target()
+	if err != nil || tgt.KeyFile != pem || !tgt.OnlyKey {
+		t.Fatalf("a real key file connects with that key: %+v %v", tgt, err)
+	}
+	m, cmd := send(m, key("enter"))
+	if m.modal != nil || cmd == nil {
+		t.Fatal("with a usable key, enter hands over to ssh")
+	}
+}
+
+func TestPemPresentOrOtherMethodNeedsNoKeyField(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "prod.pem"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if keyModel(t, dir, false).modal.(*sshModal).needKey {
+		t.Fatal("the pem exists: no Key field")
+	}
+	missing := keyModel(t, t.TempDir(), false)
+	missing, _ = send(missing, key("tab")) // Method
+	missing, _ = send(missing, tea.KeyMsg{Type: tea.KeyRight})
+	if strings.Contains(missing.View(), "Key file") {
+		t.Fatalf("a temporary key replaces the pem: no Key field:\n%s", missing.View())
+	}
+	if keyModel(t, t.TempDir(), true).modal.(*sshModal).needKey {
+		t.Fatal("demo mode has no real key files to miss")
+	}
+}

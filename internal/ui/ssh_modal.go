@@ -2,6 +2,8 @@ package ui
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +30,14 @@ type sshModal struct {
 	both   bool // both IPs available -> user can switch
 	pemDir string
 
+	// A host launched with a key pair whose .pem is not in pemDir cannot be
+	// reached with plain ssh until the user points at a key file: Enter is
+	// refused and the Key field appears.
+	keyName    string          // the key pair the host expects ("" when it has none)
+	needKey    bool            // that .pem is missing
+	keyFile    textinput.Model // the key file the user chose instead
+	keyProblem string          // why the last Enter was refused
+
 	auth    provider.Authorizer // nil when the provider has no temporary-key service
 	viaAuth bool                // connect with a temporary key pushed through auth
 
@@ -45,6 +55,7 @@ const (
 	fieldAddress
 	fieldMethod
 	fieldRoute
+	fieldKey
 )
 
 // fields lists the rows that apply to this host, in tab order.
@@ -59,6 +70,9 @@ func (sm *sshModal) fields() []sshField {
 	if len(sm.tunnels) > 0 {
 		out = append(out, fieldRoute)
 	}
+	if sm.needKey && !sm.viaAuth {
+		out = append(out, fieldKey)
+	}
 	return out
 }
 
@@ -70,10 +84,19 @@ func (sm *sshModal) current() sshField {
 func (sm *sshModal) move(d int) tea.Cmd {
 	n := len(sm.fields())
 	sm.focus = (sm.focus + d + n) % n
-	if sm.current() == fieldUser {
-		return sm.user.Focus()
-	}
+	return sm.refocus()
+}
+
+// refocus gives the cursor to the text box of the current field, if it has one.
+func (sm *sshModal) refocus() tea.Cmd {
 	sm.user.Blur()
+	sm.keyFile.Blur()
+	switch sm.current() {
+	case fieldUser:
+		return sm.user.Focus()
+	case fieldKey:
+		return sm.keyFile.Focus()
+	}
 	return nil
 }
 
@@ -88,19 +111,31 @@ func (sm *sshModal) toggle(f sshField) {
 	}
 }
 
-func newSSHModal(h provider.Host, cfg config.Config, auth provider.Authorizer, tunnels []sshx.LocalTunnel) (*sshModal, tea.Cmd) {
+// newSSHModal builds the dialog. requireKey is false in demo mode, where
+// there are no real key files to miss.
+func newSSHModal(h provider.Host, cfg config.Config, auth provider.Authorizer, tunnels []sshx.LocalTunnel, requireKey bool) (*sshModal, tea.Cmd) {
 	in := textinput.New()
 	in.Prompt = ""
 	in.Width = 30
 	in.Placeholder = "(ssh default)"
 	in.SetValue(h.DefaultUser) // the provider fills this in from the machine image; blank = ssh default
 	in.CursorEnd()
+	kf := textinput.New()
+	kf.Prompt = ""
+	kf.Width = 44
+	kf.Placeholder = "path to the key file, e.g. ~/.ssh/" + h.KeyName + ".pem"
 	sm := &sshModal{
-		host: h, user: in, both: h.PrivateIP != "" && h.PublicIP != "",
+		keyFile: kf,
+		host:    h, user: in, both: h.PrivateIP != "" && h.PublicIP != "",
 		pemDir:  config.ExpandHome(cfg.PemFilesPath),
 		auth:    auth,
 		viaAuth: auth != nil && cfg.SSHMethod == config.SSHMethodTemporaryKey,
 		tunnels: tunnels,
+	}
+	if requireKey && h.KeyName != "" && sm.pemDir != "" {
+		if f, _ := sshx.FindPem(sm.pemDir, h.KeyName); f == "" {
+			sm.keyName, sm.needKey = h.KeyName, true
+		}
 	}
 	switch {
 	case sm.both:
@@ -139,7 +174,30 @@ func (sm *sshModal) withTunnel(t sshx.Target) sshx.Target {
 // target resolves the address, and the key file for the plain ssh method.
 func (sm *sshModal) target() (sshx.Target, error) {
 	t, err := sshx.Resolve(sm.host, sm.username(), sm.pref(), sm.pemDir)
+	if err == nil && sm.needKey {
+		t, err = sm.withChosenKey(t)
+	}
 	return sm.withTunnel(t), err
+}
+
+// errKey is a problem with the key file: the dialog stays open on the Key field.
+type errKey string
+
+func (e errKey) Error() string { return string(e) }
+
+// withChosenKey adds the key file typed into the Key field, or refuses: the
+// host's own .pem is missing, so there is nothing to sign in with.
+func (sm *sshModal) withChosenKey(t sshx.Target) (sshx.Target, error) {
+	path := config.ExpandHome(strings.TrimSpace(sm.keyFile.Value()))
+	if path == "" {
+		return t, errKey(sm.keyName + ".pem was not found in " + sm.pemDir + ": enter a key file below, or use another Method")
+	}
+	ok, note := sshx.CheckKey(path)
+	if !ok {
+		return t, errKey(note)
+	}
+	t.KeyFile, t.OnlyKey, t.KeyNote = path, true, note
+	return t, nil
 }
 
 func (sm *sshModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
@@ -151,7 +209,7 @@ func (sm *sshModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 	case "shift+tab", "up":
 		return false, sm.move(-1)
 	case "left", "right", " ":
-		if sm.current() != fieldUser { // on a choice these change it; in the user box they edit
+		if sm.current() != fieldUser && sm.current() != fieldKey { // on a choice these change it; in a text box they edit
 			sm.toggle(sm.current())
 			return false, nil
 		}
@@ -160,18 +218,27 @@ func (sm *sshModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 			return true, tea.Batch(m.setStatus("pushing a temporary key via "+sm.auth.AuthLabel()+"..."), sm.authorize())
 		}
 		t, err := sm.target()
+		var ek errKey
+		if errors.As(err, &ek) { // stay in the dialog, on the field that needs fixing
+			sm.keyProblem = err.Error()
+			sm.focus = slices.Index(sm.fields(), fieldKey)
+			return false, sm.refocus()
+		}
 		if err != nil {
 			return true, m.setStatus("error: " + err.Error())
 		}
 		// the terminal is handed to ssh on a cleared screen
 		return true, execSession(m.command(t), func(err error) tea.Msg { return sshDoneMsg{err} })
 	}
-	if sm.current() != fieldUser {
-		return false, nil // typing only goes into the user box
-	}
 	var cmd tea.Cmd
-	sm.user, cmd = sm.user.Update(msg)
-	return false, cmd
+	switch sm.current() {
+	case fieldUser:
+		sm.user, cmd = sm.user.Update(msg)
+	case fieldKey:
+		sm.keyProblem = ""
+		sm.keyFile, cmd = sm.keyFile.Update(msg)
+	}
+	return false, cmd // typing only goes into a focused text box
 }
 
 // authorize generates a throwaway key, has the provider install it, and
@@ -227,6 +294,10 @@ func (sm *sshModal) preview() string {
 		return statusStyle.Render(sm.withTunnel(t).DisplayLine())
 	}
 	t, err := sm.target()
+	var ek errKey
+	if errors.As(err, &ek) {
+		return errorStyle.Render("needs a key file")
+	}
 	if err != nil {
 		return errorStyle.Render(err.Error())
 	}
@@ -252,6 +323,14 @@ func (sm *sshModal) view(w, h int) string {
 	if sm.auth != nil {
 		body = append(body, label(fieldMethod, "Method"),
 			"  "+radio(!sm.viaAuth, "SSH key", "your keys / agent")+"   "+radio(sm.viaAuth, sm.auth.AuthLabel(), "temporary key"), "")
+	}
+	if sm.needKey && !sm.viaAuth {
+		body = append(body, label(fieldKey, "Key file"), "  "+sm.keyFile.View(),
+			"  "+errorStyle.Render(sm.keyName+".pem not found in "+sm.pemDir), "")
+		if sm.keyProblem != "" {
+			body = body[:len(body)-1]
+			body = append(body, "  "+errorStyle.Render(sm.keyProblem), "")
+		}
 	}
 	if len(sm.tunnels) > 0 {
 		body = append(body, label(fieldRoute, "Route"),

@@ -92,6 +92,27 @@ func Resolve(h provider.Host, user, preferIP, pemDir string) (Target, error) {
 	return t, nil
 }
 
+// FindPem looks for <dir>/<name>.pem; see findPem.
+func FindPem(dir, name string) (path, note string) { return findPem(dir, name) }
+
+// CheckKey says whether path is a usable key file; note explains a problem
+// (missing, a directory) or a warning (permissions too open, ssh refuses it).
+func CheckKey(path string) (usable bool, note string) {
+	st, err := os.Stat(path)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return false, "no such file: " + path
+	case err != nil:
+		return false, "cannot read " + path + ": " + err.Error()
+	case st.IsDir():
+		return false, path + " is a directory, not a key file"
+	}
+	if runtime.GOOS != "windows" && st.Mode().Perm()&0o077 != 0 {
+		return true, "permissions " + st.Mode().Perm().String() + " are too open, ssh will refuse it: chmod 600 " + path
+	}
+	return true, ""
+}
+
 // findPem looks for <dir>/<name>.pem. It returns the path when usable, and a
 // note when there is something to tell the user (missing, unsafe, too open).
 func findPem(dir, name string) (path, note string) {
