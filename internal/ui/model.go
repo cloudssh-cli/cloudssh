@@ -13,6 +13,7 @@ import (
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/config"
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/SVMadhavaReddy/cloudssh/internal/sshx"
 )
 
 const (
@@ -44,6 +45,14 @@ type drilledMsg struct {
 type resolvedMsg struct {
 	host provider.Host
 	err  error
+}
+
+// eicMsg is the result of pushing a temporary key (EC2 Instance Connect):
+// on success the model runs ssh with that key and deletes it afterwards.
+type eicMsg struct {
+	target sshx.Target
+	key    sshx.TempKey
+	err    error
 }
 
 type (
@@ -276,9 +285,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.host.PrivateIP == "" && msg.host.PublicIP == "" {
 			return m, m.setStatus("error: host has no reachable IP address")
 		}
-		sm, cmd := newSSHModal(msg.host, m.cfg)
+		auth, _ := m.prov.(provider.Authorizer)
+		sm, cmd := newSSHModal(msg.host, m.cfg, auth)
 		m.modal = sm
 		return m, cmd
+
+	case eicMsg:
+		if msg.err != nil {
+			msg.key.Cleanup()
+			return m, m.setStatus("error: " + msg.err.Error())
+		}
+		key := msg.key
+		return m, tea.ExecProcess(msg.target.Command(), func(err error) tea.Msg {
+			key.Cleanup() // the temporary key never outlives the session
+			return sshDoneMsg{err}
+		})
 
 	case sshDoneMsg:
 		if msg.err != nil {

@@ -1,12 +1,16 @@
 package ui
 
 import (
+	"context"
 	"errors"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/SVMadhavaReddy/cloudssh/internal/config"
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
 
@@ -281,5 +285,128 @@ func TestSortRowsNumeric(t *testing.T) {
 	got := sortRows(r, 0, false, true)
 	if got[0].Cells[0] != "9" || got[2].Cells[0] != "x" {
 		t.Fatalf("%v", got)
+	}
+}
+
+// fakeAuthProvider is a provider that can push temporary keys.
+type fakeAuthProvider struct {
+	fakeProvider
+	got  provider.Host
+	user string
+	key  string
+	err  error
+}
+
+func (*fakeAuthProvider) AuthLabel() string { return "Fake Connect" }
+func (f *fakeAuthProvider) AuthorizeSSH(_ context.Context, h provider.Host, user, pub string) error {
+	f.got, f.user, f.key = h, user, pub
+	return f.err
+}
+
+func authModel(t *testing.T, cfg config.Config, auth *fakeAuthProvider) Model {
+	t.Helper()
+	auth.fakeProvider = fakeProvider{res: []provider.Resource{threeRows()}}
+	m := sized(New(cfg, auth), 120, 30)
+	m = settle(m, m.Init())
+	m, _ = send(m, resolvedMsg{host: provider.Host{ID: "i-1", AZ: "us-east-1a", PrivateIP: "10.0.0.1", DefaultUser: "ubuntu"}})
+	return m
+}
+
+func TestSSHDialogOffersMethodOnlyWhenProviderSupportsIt(t *testing.T) {
+	plain := loaded(t, threeRows())
+	plain, _ = send(plain, resolvedMsg{host: provider.Host{PrivateIP: "10.0.0.1"}})
+	if strings.Contains(plain.View(), "Instance Connect") || strings.Contains(plain.View(), "ctrl+t") {
+		t.Fatal("no method choice without an Authorizer")
+	}
+	plain, _ = send(plain, tea.KeyMsg{Type: tea.KeyCtrlT}) // must be inert
+	if plain.modal == nil {
+		t.Fatal("ctrl+t must not close the dialog")
+	}
+
+	m := authModel(t, testCfg(), &fakeAuthProvider{})
+	v := m.View()
+	for _, want := range []string{"Connect using:", "Fake Connect", "ctrl+t switch method", "ssh ubuntu@10.0.0.1"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("dialog missing %q", want)
+		}
+	}
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlT})
+	if v := m.View(); !strings.Contains(v, "<temporary key>") || !strings.Contains(v, "IdentitiesOnly=yes") {
+		t.Fatalf("preview should show the temporary key command:\n%s", v)
+	}
+}
+
+func TestConfigDefaultsToInstanceConnect(t *testing.T) {
+	cfg := testCfg()
+	cfg.SSHMethod = "instance-connect"
+	m := authModel(t, cfg, &fakeAuthProvider{})
+	if !m.modal.(*sshModal).viaAuth || !strings.Contains(m.View(), "<temporary key>") {
+		t.Fatal("ssh_method: instance-connect should preselect the temporary key")
+	}
+	// but a provider without the capability falls back to plain ssh
+	plain := loaded(t, threeRows())
+	plain.cfg.SSHMethod = "instance-connect"
+	plain, _ = send(plain, resolvedMsg{host: provider.Host{PrivateIP: "10.0.0.1"}})
+	if plain.modal.(*sshModal).viaAuth {
+		t.Fatal("must not select a method the provider lacks")
+	}
+}
+
+func TestInstanceConnectPushesKeyThenRunsSSHAndCleansUp(t *testing.T) {
+	if _, err := exec.LookPath("ssh-keygen"); err != nil {
+		t.Skip("ssh-keygen not installed")
+	}
+	auth := &fakeAuthProvider{}
+	m := authModel(t, testCfg(), auth)
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlT})
+	m, cmd := send(m, key("enter"))
+	if m.modal != nil || !strings.Contains(m.status, "temporary key") {
+		t.Fatalf("modal=%v status=%q", m.modal, m.status)
+	}
+	var ready eicMsg
+	for _, msg := range run(cmd) {
+		if e, ok := msg.(eicMsg); ok {
+			ready = e
+		}
+	}
+	defer ready.key.Cleanup()
+	if ready.err != nil {
+		t.Fatal(ready.err)
+	}
+	if auth.got.ID != "i-1" || auth.got.AZ != "us-east-1a" || auth.user != "ubuntu" || !strings.HasPrefix(auth.key, "ssh-ed25519 ") {
+		t.Fatalf("authorizer got host=%+v user=%q key=%q", auth.got, auth.user, auth.key)
+	}
+	args := strings.Join(ready.target.Args(), " ")
+	if !strings.Contains(args, "-i "+ready.key.Path) || !strings.Contains(args, "IdentitiesOnly=yes") || !strings.HasSuffix(args, "ubuntu@10.0.0.1") {
+		t.Fatalf("ssh args: %s", args)
+	}
+	if _, cmd = send(m, ready); cmd == nil {
+		t.Fatal("eicMsg should start ssh")
+	}
+}
+
+func TestInstanceConnectFailureCleansUpAndReports(t *testing.T) {
+	if _, err := exec.LookPath("ssh-keygen"); err != nil {
+		t.Skip("ssh-keygen not installed")
+	}
+	auth := &fakeAuthProvider{err: errors.New("AccessDenied")}
+	m := authModel(t, testCfg(), auth)
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlT})
+	m, cmd := send(m, key("enter"))
+	var res eicMsg
+	for _, msg := range run(cmd) {
+		if e, ok := msg.(eicMsg); ok {
+			res = e
+		}
+	}
+	if res.err == nil || res.key.Dir == "" {
+		t.Fatalf("expected an error carrying the key to clean up: %+v", res)
+	}
+	m, _ = send(m, res)
+	if !strings.Contains(m.status, "AccessDenied") {
+		t.Fatalf("status=%q", m.status)
+	}
+	if _, err := os.Stat(res.key.Dir); !os.IsNotExist(err) {
+		t.Fatal("temporary key must be deleted when authorisation fails")
 	}
 }

@@ -73,6 +73,7 @@ func newHelp(m *Model) *helpModal {
 		"",
 		helpHeading("SSH dialog"),
 		helpEntry("tab", "Switch private / public IP"),
+		helpEntry("ctrl+t", "Switch between your SSH key and EC2 Instance Connect (when available)"),
 		helpEntry("enter / esc", "Connect / cancel"))
 	return &helpModal{lines: l}
 }
