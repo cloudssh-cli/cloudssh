@@ -35,3 +35,21 @@ func TestLoadOverridesAndClampsPageSize(t *testing.T) {
 		t.Fatalf("unexpected cfg: %+v", cfg)
 	}
 }
+
+func TestViewAndSplashDefaultsAndOverride(t *testing.T) {
+	d := Default()
+	if d.View != "ec2" || d.SkipSplash {
+		t.Fatalf("defaults: %+v", d)
+	}
+	p := filepath.Join(t.TempDir(), "c.yaml")
+	if err := os.WriteFile(p, []byte("view: dashboard\nskip_splash: true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(p, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.View != "dashboard" || !cfg.SkipSplash {
+		t.Fatalf("overrides: %+v", cfg)
+	}
+}

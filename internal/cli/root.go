@@ -4,6 +4,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -17,8 +18,9 @@ import (
 
 func NewRootCmd() *cobra.Command {
 	var (
-		cfgPath                string
-		cloud, profile, region string
+		cfgPath                            string
+		cloud, profile, region, view, pems string
+		pageSize                           int
 	)
 	cmd := &cobra.Command{
 		Use:           "cloudssh",
@@ -48,6 +50,15 @@ func NewRootCmd() *cobra.Command {
 			if region != "" {
 				cfg.Region = region
 			}
+			if view != "" {
+				cfg.View = view
+			}
+			if pems != "" {
+				cfg.PemFilesPath = pems
+			}
+			if pageSize > 0 {
+				cfg.PageSize = int32(max(pageSize, 5)) //nolint:gosec // bounded by a CLI int, API caps apply later
+			}
 
 			var prov provider.Provider
 			switch cfg.Cloud {
@@ -59,6 +70,9 @@ func NewRootCmd() *cobra.Command {
 			default:
 				return fmt.Errorf("cloud %q is not supported yet", cfg.Cloud)
 			}
+			if err := validateView(cfg.View, prov); err != nil {
+				return err
+			}
 			_, err = tea.NewProgram(ui.New(cfg, prov), tea.WithAltScreen()).Run()
 			return err
 		},
@@ -67,6 +81,24 @@ func NewRootCmd() *cobra.Command {
 	cmd.Flags().StringVar(&cloud, "cloud", "", "cloud provider (aws)")
 	cmd.Flags().StringVar(&profile, "profile", "", "AWS profile")
 	cmd.Flags().StringVar(&region, "region", "", "AWS region")
+	cmd.Flags().StringVar(&pems, "pem-files-path", "", "directory holding <key-pair-name>.pem files")
+	cmd.Flags().IntVar(&pageSize, "page-size", 0, "items per page (minimum 5)")
+	cmd.Flags().StringVar(&view, "view", "", "screen to open first: dashboard, ec2, ecs, eks, asg, vpc (default ec2)")
 	cmd.SetVersionTemplate(fmt.Sprintf("cloudssh %s (commit %s, built %s)\n", version.Version, version.Commit, version.Date))
 	return cmd
+}
+
+// validateView checks that view is "dashboard" or one of the provider's resources.
+func validateView(view string, p provider.Provider) error {
+	keys := []string{"dashboard"}
+	for _, r := range p.Resources() {
+		if r.Key() == view {
+			return nil
+		}
+		keys = append(keys, r.Key())
+	}
+	if view == "dashboard" {
+		return nil
+	}
+	return fmt.Errorf("view %q not found for %s (choose one of: %s)", view, p.Name(), strings.Join(keys, ", "))
 }

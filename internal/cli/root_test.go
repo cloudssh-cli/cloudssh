@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	awsprov "github.com/SVMadhavaReddy/cloudssh/internal/provider/aws"
 )
 
 func run(t *testing.T, args ...string) (string, error) {
@@ -54,4 +57,23 @@ func writeConfig(t *testing.T, body string) string {
 		t.Fatal(err)
 	}
 	return p
+}
+
+type viewProv struct{}
+
+func (viewProv) Name() string { return "aws" }
+func (viewProv) Resources() []provider.Resource {
+	return (&awsprov.Provider{}).Resources()
+}
+
+func TestValidateView(t *testing.T) {
+	for _, ok := range []string{"dashboard", "ec2", "ecs", "eks", "asg", "vpc"} {
+		if err := validateView(ok, viewProv{}); err != nil {
+			t.Errorf("%s: %v", ok, err)
+		}
+	}
+	err := validateView("nope", viewProv{})
+	if err == nil || !strings.Contains(err.Error(), "dashboard, ec2, ecs, eks, asg, vpc") {
+		t.Fatalf("want helpful error, got %v", err)
+	}
 }

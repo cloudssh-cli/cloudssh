@@ -17,6 +17,9 @@ type Config struct {
 	PemFilesPath string `yaml:"pem_files_path"`
 	DefaultIP    string `yaml:"default_ip_type"` // "private" or "public"
 	PageSize     int32  `yaml:"page_size"`
+	// View is the screen opened at start: "dashboard" or a resource key (ec2, ecs, eks, asg, vpc).
+	View       string `yaml:"view"`
+	SkipSplash bool   `yaml:"skip_splash"`
 }
 
 // Default returns the built-in configuration.
@@ -26,6 +29,7 @@ func Default() Config {
 		PemFilesPath: "~/.cloudssh/pems",
 		DefaultIP:    "private",
 		PageSize:     50,
+		View:         "ec2",
 	}
 }
 
