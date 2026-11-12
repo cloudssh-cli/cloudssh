@@ -77,3 +77,18 @@ func TestValidateView(t *testing.T) {
 		t.Fatalf("want helpful error, got %v", err)
 	}
 }
+
+func TestEffectivePageSize(t *testing.T) {
+	for _, c := range []struct {
+		flag       int
+		demo       bool
+		configured int32
+		want       int32
+	}{
+		{0, false, 50, 50}, {0, true, 50, 25}, {10, true, 50, 10}, {2, false, 50, 5}, {100, false, 50, 100},
+	} {
+		if got := effectivePageSize(c.flag, c.demo, c.configured); got != c.want {
+			t.Errorf("flag=%d demo=%v configured=%d: got %d, want %d", c.flag, c.demo, c.configured, got, c.want)
+		}
+	}
+}

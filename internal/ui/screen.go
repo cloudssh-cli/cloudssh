@@ -60,7 +60,7 @@ func (s *screen) refreshView() {
 	needle := strings.ToLower(s.search)
 	filtered := make([]provider.Row, 0, len(s.rows))
 	for _, r := range s.rows {
-		if needle == "" || strings.Contains(strings.ToLower(strings.Join(r.Cells, "\x00")), needle) {
+		if matchSearch(needle, strings.ToLower(strings.Join(r.Cells, "\x00"))) {
 			filtered = append(filtered, r)
 		}
 	}
@@ -159,4 +159,34 @@ func (s *screen) filterChips(width int) string {
 		out = next
 	}
 	return fit(strings.TrimRight(out, " "), min(len(out), width))
+}
+
+// matchSearch reports whether text (already lower-case) satisfies the search
+// query (lower-case). "a|b" means a or b; spaces inside an alternative mean
+// and; a leading "!" negates a term ("web !canary"). A query with no usable
+// term matches everything.
+func matchSearch(query, text string) bool {
+	any := false
+	for _, alt := range strings.Split(query, "|") {
+		ok, used := true, false
+		for _, term := range strings.Fields(alt) {
+			neg := strings.HasPrefix(term, "!")
+			term = strings.TrimPrefix(term, "!")
+			if term == "" {
+				continue
+			}
+			used = true
+			if strings.Contains(text, term) == neg {
+				ok = false
+				break
+			}
+		}
+		if used {
+			any = true
+			if ok {
+				return true
+			}
+		}
+	}
+	return !any
 }

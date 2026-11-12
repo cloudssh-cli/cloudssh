@@ -18,8 +18,8 @@ import (
 	"github.com/SVMadhavaReddy/cloudssh/internal/version"
 )
 
-// demoPageSize makes paging visible with the small sample data sets.
-const demoPageSize = 8
+// demoPageSize: the sample fleet then spans two pages, enough to try paging and search.
+const demoPageSize = 25
 
 func NewRootCmd() *cobra.Command {
 	var (
@@ -68,12 +68,7 @@ func NewRootCmd() *cobra.Command {
 			if pems != "" {
 				cfg.PemFilesPath = pems
 			}
-			switch {
-			case pageSize > 0:
-				cfg.PageSize = int32(max(pageSize, 5)) //nolint:gosec // bounded by a CLI int, API caps apply later
-			case demo:
-				cfg.PageSize = demoPageSize
-			}
+			cfg.PageSize = effectivePageSize(pageSize, demo, cfg.PageSize)
 
 			prov, err := cloud.Open(context.Background(), cfg.Cloud, provider.Options{
 				Profile: cfg.Profile, Region: cfg.Region, PageSize: cfg.PageSize, Demo: demo,
@@ -115,4 +110,16 @@ func validateView(view string, p provider.Provider) error {
 		keys = append(keys, r.Key())
 	}
 	return fmt.Errorf("view %q not found for %s (choose one of: %s)", view, p.Name(), strings.Join(keys, ", "))
+}
+
+// effectivePageSize: an explicit --page-size wins (minimum 5), demo mode
+// defaults to demoPageSize, otherwise the configured value stands.
+func effectivePageSize(flag int, demo bool, configured int32) int32 {
+	switch {
+	case flag > 0:
+		return int32(max(flag, 5)) //nolint:gosec // bounded by a CLI int, API caps apply later
+	case demo:
+		return demoPageSize
+	}
+	return configured
 }
