@@ -28,7 +28,7 @@ Start on a specific screen with `--view dashboard|ec2|ecs|eks|asg|vpc`. Press `?
 | `↑↓` `j k` · `pgup pgdn` · `g G` | move |
 | `enter` | drill into the row (ASG → instances, VPC → subnets → instances, ECS cluster → services → tasks → instance, EKS cluster → node groups → instances); on instances, SSH |
 | `esc` | clear search, then go back one level |
-| `S` | SSH dialog: user, private/public IP, command preview |
+| `S` | SSH dialog: user, private/public IP, command preview, and `ctrl+t` to connect with [EC2 Instance Connect](#ec2-instance-connect) instead of your own key |
 | `/` `f` `s` | search loaded rows (`↑↓` in the box recall previous searches) |
 | `F` | server-side filters: every filter (name, state, type, AZ, IPs, ASG, …) is listed, fill in the ones you want; `ctrl+x` clears all |
 | `shift`+letter | sort by a column, again to reverse (letters listed in `?`) |
@@ -45,10 +45,17 @@ profile: default
 region: us-east-1
 pem_files_path: ~/.cloudssh/pems   # <key-pair-name>.pem is passed with -i when present
 default_ip_type: private           # or public
+ssh_method: ssh                    # or instance-connect (temporary key via EC2 Instance Connect)
 page_size: 50
 view: ec2                          # dashboard, ec2, ecs, eks, asg or vpc
 skip_splash: false
 ```
+
+## EC2 Instance Connect
+
+No key pair needed: in the SSH dialog press `ctrl+t` (or set `ssh_method: instance-connect` / `--ssh-method instance-connect`). cloudssh generates a throwaway ed25519 key with `ssh-keygen`, pushes the public half to the instance with `SendSSHPublicKey` (valid for about 60 seconds), runs your system `ssh` with only that key, and deletes it when the session ends. No AWS CLI is needed.
+
+Requirements: the IAM permission `ec2-instance-connect:SendSSHPublicKey`, an AMI with Instance Connect installed (Amazon Linux 2/2023, Ubuntu 20.04+), port 22 reachable from your machine, and the right user (the dialog pre-fills the AMI's default). Private-only instances need a network path (VPN, bastion); EC2 Instance Connect Endpoint tunnels are not supported yet.
 
 ## Development
 
