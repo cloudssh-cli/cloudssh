@@ -24,10 +24,10 @@ const demoPageSize = 25
 
 func NewRootCmd() *cobra.Command {
 	var (
-		cfgPath                                     string
-		cloudName, profile, region, view, pems, ssh string
-		pageSize                                    int
-		demo                                        bool
+		cfgPath                                            string
+		cloudName, profile, region, view, pems, ssh, theme string
+		pageSize                                           int
+		demo                                               bool
 	)
 	cmd := &cobra.Command{
 		Use:           "cloudssh",
@@ -70,6 +70,12 @@ func NewRootCmd() *cobra.Command {
 				cfg.PemFilesPath = pems
 			}
 			cfg.PageSize = effectivePageSize(pageSize, demo, cfg.PageSize)
+			if theme != "" {
+				cfg.Theme = theme
+			}
+			if err := ui.SetTheme(cfg.Theme); err != nil {
+				return err
+			}
 
 			prov, err := cloud.Open(context.Background(), cfg.Cloud, provider.Options{
 				Profile: cfg.Profile, Region: cfg.Region, PageSize: cfg.PageSize, Demo: demo,
@@ -93,6 +99,7 @@ func NewRootCmd() *cobra.Command {
 	f.StringVar(&ssh, "ssh-method", "", fmt.Sprintf("default connection method: %q (your keys) or %q (a short-lived key pushed through the cloud, when offered)", config.SSHMethodSSH, config.SSHMethodTemporaryKey))
 	f.StringVar(&pems, "pem-files-path", "", "directory holding <key-pair-name>.pem files")
 	f.IntVar(&pageSize, "page-size", 0, "items per page (minimum 5)")
+	f.StringVar(&theme, "theme", "", "colour theme: "+strings.Join(ui.ThemeNames(), ", ")+" (default auto: follows the terminal background, dark if unknown)")
 	f.StringVar(&view, "view", "", "screen to open first: dashboard or a resource key of the chosen cloud (default: its first resource)")
 	cmd.SetVersionTemplate(fmt.Sprintf("cloudssh %s (commit %s, built %s)\n", version.Version, version.Commit, version.Date))
 	return cmd

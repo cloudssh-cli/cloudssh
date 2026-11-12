@@ -88,6 +88,7 @@ type Model struct {
 	prov      provider.Provider
 	resources []provider.Resource
 	stacks    [][]*screen
+	forward   [][]*screen // per mode: screens left with [ that ] can bring back
 	mode      int
 	nextID    int
 
@@ -125,6 +126,7 @@ func New(cfg config.Config, p provider.Provider) Model {
 		splashing: !cfg.SkipSplash, nextID: 1, detectTunnels: sshx.DetectTunnels,
 	}
 	m.stacks = make([][]*screen, len(m.resources)+2) // 0 dashboard, 1..n resources, n+1 profiles
+	m.forward = make([][]*screen, len(m.resources)+2)
 	m.mode = m.startMode()
 	if d, ok := p.(provider.Demoer); ok && d.Demo() {
 		m.demo, m.detectTunnels = true, nil // nothing real to tunnel to
@@ -437,7 +439,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, next
 		}
 		if s.nextToken == "" {
-			return m, m.setStatus(fmt.Sprintf("%d loaded. No more pages left!", len(s.rows)))
+			return m, m.setStatus(fmt.Sprintf("All %d loaded", len(s.rows)))
 		}
 		return m, m.setStatus(fmt.Sprintf("%d loaded. Press n for the next page", len(s.rows)))
 
@@ -487,7 +489,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Signed in (possibly as someone else): drop everything loaded for the old account.
 		for i := 1; i <= len(m.resources); i++ {
-			m.stacks[i] = nil
+			m.stacks[i], m.forward[i] = nil, nil
 		}
 		m.hasProfiles = len(m.auth.Profiles()) > 0
 		back := m.prevMode
@@ -509,6 +511,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if n := len(st); n > 0 && st[n-1].id == msg.from { // only if still on top
 				s := m.newScreen(msg.drill.Resource, msg.drill.Filters)
 				m.stacks[mode] = append(st, s)
+				m.forward[mode] = nil // a new drill replaces whatever ] would have returned to
 				return m, s.load("", false)
 			}
 		}
@@ -612,6 +615,29 @@ func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// goBack leaves the top screen of this view, remembering it for goForward.
+func (m *Model) goBack() {
+	st := m.stacks[m.mode]
+	m.forward[m.mode] = append(m.forward[m.mode], st[len(st)-1])
+	m.stacks[m.mode] = st[:len(st)-1]
+}
+
+// goForward returns to the screen goBack left, reloading it if its data was
+// still on its way when it was left.
+func (m *Model) goForward() (tea.Cmd, bool) {
+	fw := m.forward[m.mode]
+	if len(fw) == 0 {
+		return nil, false
+	}
+	s := fw[len(fw)-1]
+	m.forward[m.mode] = fw[:len(fw)-1]
+	m.stacks[m.mode] = append(m.stacks[m.mode], s)
+	if s.loading {
+		return s.reload(), true
+	}
+	return nil, true
+}
+
 func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	k := msg.String()
 
@@ -635,6 +661,28 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			mode = int(k[0] - '0')
 		}
 		cmd := m.switchMode(mode)
+		return m, cmd
+	}
+
+	switch k {
+	case "{", "}": // previous / next view, wrapping around
+		if m.authErr != nil || m.mode > len(m.resources) {
+			return m, nil
+		}
+		n := len(m.resources) + 1
+		cmd := m.switchMode((m.mode + n + map[string]int{"{": -1, "}": 1}[k]) % n)
+		return m, cmd
+	case "[":
+		if len(m.stacks[m.mode]) < 2 {
+			return m, m.setStatus("nothing to go back to")
+		}
+		m.goBack()
+		return m, nil
+	case "]":
+		cmd, ok := m.goForward()
+		if !ok {
+			return m, m.setStatus("nothing to go forward to")
+		}
 		return m, cmd
 	}
 
@@ -664,7 +712,7 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.filter.SetValue("")
 			s.refreshView()
 		case len(m.stacks[m.mode]) > 1:
-			m.stacks[m.mode] = m.stacks[m.mode][:len(m.stacks[m.mode])-1]
+			m.goBack()
 		case m.mode == m.profilesMode() && m.authErr == nil:
 			cmd := m.leaveProfiles()
 			return m, cmd
@@ -900,6 +948,9 @@ func (m Model) hints() []hint {
 		if len(m.stacks[m.mode]) > 1 {
 			h = append(h, hint{"esc", "Go back"})
 		}
+		if len(m.forward[m.mode]) > 0 {
+			h = append(h, hint{"]", "Go forward"})
+		}
 	}
 	if len(m.resources) > 1 {
 		h = append(h, hint{fmt.Sprintf("1-%d", min(len(m.resources), 9)), "Switch view"})
@@ -984,8 +1035,10 @@ func (m Model) footer(s *screen) string {
 
 	r := ""
 	if s != nil {
+		// "..." only while the first page is on its way; later background
+		// pages just raise the count
 		pages := hintKeyStyle.Render("...")
-		if !s.loading {
+		if s.pages > 0 || !s.loading {
 			n := fmt.Sprintf("%d", s.pages)
 			if s.nextToken != "" {
 				n += "+"
@@ -993,6 +1046,9 @@ func (m Model) footer(s *screen) string {
 			pages = hintKeyStyle.Render(n)
 		}
 		r = "Pages: " + pages
+		if s.pages > 0 && s.nextToken == "" && !s.loading {
+			r += " " + lipgloss.NewStyle().Foreground(colOK).Render("· all loaded")
+		}
 	}
 	gap := max(m.width-lipgloss.Width(l)-lipgloss.Width(r), 1)
 	line1 := fit(l+strings.Repeat(" ", gap)+r, m.width)

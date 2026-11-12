@@ -40,6 +40,9 @@ type Config struct {
 	// SSHMethodTemporaryKey (a short-lived key pushed through the cloud's own
 	// service, when the cloud offers one).
 	SSHMethod string `yaml:"ssh_method"`
+	// Theme is "auto" (follow the terminal's light/dark background, dark when
+	// it cannot tell) or the name of a built-in theme.
+	Theme string `yaml:"theme"`
 }
 
 // Default returns the built-in configuration.
@@ -52,6 +55,7 @@ func Default() Config {
 		Prefetch:     3, SearchPrefetch: 10, PrefetchDelayMs: 250,
 		View:      "",
 		SSHMethod: SSHMethodSSH,
+		Theme:     "auto",
 	}
 }
 

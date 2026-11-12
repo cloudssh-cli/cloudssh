@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -230,14 +231,26 @@ func TestHelpViewsAreOnePerLine(t *testing.T) {
 func TestHelpWrapsBetweenItemsNeverInsideThem(t *testing.T) {
 	m := helpFixture(t, 60, 60)
 	v := strings.ReplaceAll(m.View(), "\u00a0", " ")
-	for _, want := range []string{"pgup pgdn page", "next field", "change a choice", "Private IP"} {
-		if !strings.Contains(v, want) {
+	for _, want := range []string{`pgup pgdn\s+page`, `tab ↑ ↓\s+next field`, `← →\s+change a choice`} { // a tall screen: one entry per line, label beside its key
+		if !regexp.MustCompile(want).MatchString(v) {
 			t.Errorf("an item was split or lost: %q\n%s", want, v)
 		}
 	}
 	for _, l := range strings.Split(v, "\n") {
 		if strings.HasPrefix(l, "│") && strings.Contains(l, "…") {
 			t.Errorf("wrapping must replace ellipses: %q", l)
+		}
+	}
+}
+
+// With too little height the help falls back to packed "key label" chips, and
+// still never splits an item.
+func TestHelpPacksItemsWhenTheScreenIsShort(t *testing.T) {
+	m := helpFixture(t, 60, 40)
+	v := strings.ReplaceAll(m.View(), "\u00a0", " ")
+	for _, want := range []string{"pgup pgdn page", "next field", "change a choice"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("an item was split or lost: %q\n%s", want, v)
 		}
 	}
 }

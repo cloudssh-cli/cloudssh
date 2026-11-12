@@ -11,7 +11,7 @@ Key handling lives in `internal/ui/model.go` (`handleKey` → `updateKey`).
 
 **Prefer context over chords.** Do not add ctrl+key shortcuts. Inside a dialog, make the context the interface: tab / shift+tab / up / down move between fields, left/right (or space) change a choice on a focused row, enter confirms, esc cancels, and typing only goes into a focused text box (see `ssh_modal.go`, `filters_modal.go`). A new option becomes a new field, not a new key.
 
-**Other fixed keys:** `d 0` dashboard, `1-9` modes, `? q / f s r n enter esc j k h l g`, ctrl+b/f page. ctrl+h is backspace in most terminals: never bind it.
+**Other fixed keys:** `d 0` dashboard, `1-9` modes, `[ ]` back/forward through drills, `{ }` previous/next view, `? q / f s r n enter esc j k h l g`, ctrl+b/f page. ctrl+h is backspace in most terminals: never bind it.
 
 **Checklist for a new binding**
 1. Handle it in `updateKey` (or the modal's `key`).
@@ -20,3 +20,7 @@ Key handling lives in `internal/ui/model.go` (`handleKey` → `updateKey`).
 4. README key table.
 5. Tests in `nav_test.go`/`model_test.go`: the key works, it does not leak from search/modals, and `TestEveryStateFitsTheScreen` still passes.
 6. Verify the look with the `tui-preview` skill.
+
+
+## Colours and themes
+Never write a colour literal in `internal/ui`. Every colour is a role of `Theme` (`theme.go`); styles are rebuilt from it by `applyTheme`. Use the existing styles (`hintKeyStyle`, `helpKeyStyle`, …) or add a role to *every* theme (`TestThemesAreCompleteAndDistinct` checks). The help page deliberately uses its own roles (`HelpKey`, `HelpHead`) so it does not look like the header.

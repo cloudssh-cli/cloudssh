@@ -7,46 +7,57 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Default colour palette.
+// The palette and the styles built from it. They are filled in by applyTheme
+// (theme.go), at start and whenever the theme changes.
 var (
-	colFg        = lipgloss.Color("#6FD0FF")
-	colPrimary   = lipgloss.Color("#FF00FF")
-	colSecondary = lipgloss.Color("#00FFFF")
-	colAccent    = lipgloss.Color("#FFFFFF")
-	colMuted     = lipgloss.Color("#808080")
-	colOK        = lipgloss.Color("#A3BE8C")
-	colWarn      = lipgloss.Color("#EBCB8B")
-	colErr       = lipgloss.Color("#BF616A")
-	colBlack     = lipgloss.Color("#000000")
+	colFg, colPrimary, colSecondary, colAccent, colMuted lipgloss.Color
+	colOK, colWarn, colErr, colBlack                     lipgloss.Color
+	colHelpKey, colHelpHead                              lipgloss.Color
+	fadeTo                                               string
+
+	borderStyle, hintKeyStyle, hintDescStyle, infoKeyStyle, infoValStyle lipgloss.Style
+	headStyle, headSortStyle, selectedStyle, cellStyle                   lipgloss.Style
+	crumbStyle, crumbActive, statusStyle, errorStyle, warnStyle          lipgloss.Style
+	helpKeyStyle, helpHeadStyle                                          lipgloss.Style
+
+	// stateStyles colours well-known resource states, k9s style.
+	stateStyles map[string]lipgloss.Style
 )
 
-var (
-	borderStyle   = lipgloss.NewStyle().Foreground(colFg)
-	hintKeyStyle  = lipgloss.NewStyle().Bold(true).Foreground(colPrimary)
-	hintDescStyle = lipgloss.NewStyle().Foreground(colMuted)
-	infoKeyStyle  = lipgloss.NewStyle().Bold(true).Foreground(colPrimary)
-	infoValStyle  = lipgloss.NewStyle().Foreground(colFg)
-	headStyle     = lipgloss.NewStyle().Bold(true).Foreground(colAccent)
-	headSortStyle = lipgloss.NewStyle().Bold(true).Foreground(colPrimary)
-	selectedStyle = lipgloss.NewStyle().Bold(true).Foreground(colBlack).Background(colSecondary)
-	cellStyle     = lipgloss.NewStyle().Foreground(colFg)
-	crumbStyle    = lipgloss.NewStyle().Bold(true).Foreground(colBlack).Background(colFg)
-	crumbActive   = lipgloss.NewStyle().Bold(true).Foreground(colBlack).Background(colSecondary)
-	statusStyle   = lipgloss.NewStyle().Foreground(colSecondary)
-	errorStyle    = lipgloss.NewStyle().Foreground(colErr)
-	warnStyle     = lipgloss.NewStyle().Foreground(colWarn)
-)
+func applyTheme(t Theme) {
+	c := func(s string) lipgloss.Color { return lipgloss.Color(s) }
+	colFg, colPrimary, colSecondary, colAccent, colMuted = c(t.Border), c(t.Title), c(t.Highlight), c(t.Strong), c(t.Muted)
+	colOK, colWarn, colErr, colBlack = c(t.OK), c(t.Warn), c(t.Err), c(t.OnFill)
+	colHelpKey, colHelpHead, fadeTo = c(t.HelpKey), c(t.HelpHead), t.Fade
 
-// stateStyles colours well-known resource states, k9s style.
-var stateStyles = map[string]lipgloss.Style{
-	"running":       lipgloss.NewStyle().Foreground(colOK),
-	"available":     lipgloss.NewStyle().Foreground(colOK),
-	"active":        lipgloss.NewStyle().Foreground(colOK),
-	"pending":       lipgloss.NewStyle().Foreground(colWarn),
-	"stopping":      lipgloss.NewStyle().Foreground(colWarn),
-	"stopped":       lipgloss.NewStyle().Foreground(colErr),
-	"terminated":    lipgloss.NewStyle().Foreground(colErr),
-	"shutting-down": lipgloss.NewStyle().Foreground(colWarn),
+	fg := lipgloss.NewStyle().Foreground
+	borderStyle = fg(colFg)
+	hintKeyStyle = fg(colPrimary).Bold(true)
+	hintDescStyle = fg(colMuted)
+	infoKeyStyle = fg(colPrimary).Bold(true)
+	infoValStyle = fg(colFg)
+	headStyle = fg(colAccent).Bold(true)
+	headSortStyle = fg(colPrimary).Bold(true)
+	selectedStyle = fg(colBlack).Background(colSecondary).Bold(true)
+	cellStyle = fg(colFg)
+	crumbStyle = fg(colBlack).Background(colFg).Bold(true)
+	crumbActive = fg(colBlack).Background(colSecondary).Bold(true)
+	statusStyle = fg(colSecondary)
+	errorStyle = fg(colErr)
+	warnStyle = fg(colWarn)
+	helpKeyStyle = fg(colHelpKey).Bold(true)
+	helpHeadStyle = fg(colHelpHead).Bold(true)
+
+	stateStyles = map[string]lipgloss.Style{
+		"running":       fg(colOK),
+		"available":     fg(colOK),
+		"active":        fg(colOK),
+		"pending":       fg(colWarn),
+		"stopping":      fg(colWarn),
+		"stopped":       fg(colErr),
+		"terminated":    fg(colErr),
+		"shutting-down": fg(colWarn),
+	}
 }
 
 func styleFor(cell string) lipgloss.Style {

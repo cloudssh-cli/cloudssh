@@ -80,7 +80,7 @@ const splashFadeSteps = 10
 // splashView draws the logo centred on the whole screen, fading out as step
 // goes from 0 to splashFadeSteps.
 func splashView(w, h, step int) string {
-	st := lipgloss.NewStyle().Bold(true).Foreground(lerpColor("#6FD0FF", "#0B0B0B", float64(step)/splashFadeSteps))
+	st := lipgloss.NewStyle().Bold(true).Foreground(lerpColor(string(colFg), fadeTo, float64(step)/splashFadeSteps))
 	lines := logoLines(st, w)
 	top := max((h-len(lines))/2, 0)
 	out := make([]string, 0, h)

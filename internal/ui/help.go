@@ -21,8 +21,9 @@ type helpEntry struct{ key, desc string }
 type helpSection struct {
 	title   string
 	entries []helpEntry
-	// oneLine lists every entry on its own line (Views); otherwise entries
-	// flow as compact "key label" chips, wrapped at item boundaries.
+	// oneLine lists every entry on its own line (always for Views, and for
+	// every section when the screen is tall enough); otherwise entries flow as
+	// compact "key label" chips, wrapped at item boundaries.
 	oneLine bool
 }
 
@@ -36,7 +37,7 @@ type helpModal struct {
 }
 
 func helpSections(m *Model) []helpSection {
-	views := []helpEntry{{"d  0", "Dashboard"}}
+	views := []helpEntry{{"d  0", "Dashboard"}, {"{  }", "previous / next view"}}
 	for i, r := range m.resources {
 		if i < 9 {
 			views = append(views, helpEntry{fmt.Sprint(i + 1), r.Label()})
@@ -50,13 +51,15 @@ func helpSections(m *Model) []helpSection {
 	secs := []helpSection{
 		{title: "Table", entries: []helpEntry{
 			{"↑ ↓ j k", "move"}, {"pgup pgdn", "page"}, {"g home", "top"}, {"G end", "bottom"}, {"← → h l", "scroll columns"},
-			{"enter", "open row or ssh"}, {"S", "ssh"}, {"esc", "back"},
+			{"enter", "open row or ssh"}, {"S", "ssh"}, {"esc  [", "back"}, {"]", "forward"},
 		}},
 		{title: "Data", entries: []helpEntry{
 			{"/ f s", "search"}, {"F", "filters"}, {"r", "refresh"}, {"R", "reset filters, search, sort"}, {"n", "next page"},
 		}},
 		{title: "Search & filters", entries: []helpEntry{
-			{"a b  a&b", "and"}, {"a|b  a,b", "or"}, {"!a", "not"}, {"", "same syntax in search and in filters"},
+			{"a b  a&b", "and"}, {"a|b  a,b", "or"}, {"!a", "not"}, {"( )", "group"},
+			{"web&(api|db)", "web and either api or db"}, {"(a|b) !c", "a or b, but not c"},
+			{"", "the same in search and in filters"},
 		}},
 	}
 	if s := m.cur(); s != nil {
@@ -98,7 +101,7 @@ func wrap(s string, w int) []string {
 // one entry per line or compact "key label" chips wrapped between items.
 func renderSection(sec helpSection, w int) []string {
 	rule := max(w-lipgloss.Width(sec.title)-4, 0)
-	out := []string{hintDescStyle.Render("── ") + headStyle.Render(sec.title) + hintDescStyle.Render(" "+strings.Repeat("─", rule))}
+	out := []string{hintDescStyle.Render("── ") + helpHeadStyle.Render(sec.title) + hintDescStyle.Render(" "+strings.Repeat("─", rule))}
 
 	if sec.oneLine {
 		kw := 1
@@ -106,7 +109,7 @@ func renderSection(sec helpSection, w int) []string {
 			kw = max(kw, lipgloss.Width(e.key))
 		}
 		for _, e := range sec.entries {
-			out = append(out, "  "+hintKeyStyle.Render(fit(e.key, kw))+"  "+hintDescStyle.Render(e.desc))
+			out = append(out, "  "+helpKeyStyle.Render(fit(e.key, kw))+"  "+hintDescStyle.Render(e.desc))
 		}
 		return append(out, "")
 	}
@@ -119,7 +122,7 @@ func renderSection(sec helpSection, w int) []string {
 		line, lineW = "  ", 2
 	}
 	for _, e := range sec.entries {
-		item := hintKeyStyle.Render(e.key) + " " + hintDescStyle.Render(e.desc)
+		item := helpKeyStyle.Render(e.key) + " " + hintDescStyle.Render(e.desc)
 		iw := lipgloss.Width(e.key) + 1 + lipgloss.Width(e.desc)
 		if lineW > 2 && lineW+3+iw > w {
 			flush()
@@ -134,8 +137,24 @@ func renderSection(sec helpSection, w int) []string {
 }
 
 // helpLayout flows the sections into columns that fit width and returns the
-// finished lines (each exactly width wide).
-func helpLayout(secs []helpSection, width, minHeight int) []string {
+// finished lines (each exactly width wide). When there is height to spare
+// (rows > 0) every entry gets its own line; when there is not, entries are
+// packed as compact "key label" chips so as much as possible stays in view.
+func helpLayout(secs []helpSection, width, rows int) []string {
+	if rows > 0 {
+		roomy := make([]helpSection, len(secs))
+		for i, s := range secs {
+			s.oneLine = true
+			roomy[i] = s
+		}
+		if len(flowHelp(roomy, width, 0)) <= rows {
+			return flowHelp(roomy, width, rows)
+		}
+	}
+	return flowHelp(secs, width, rows)
+}
+
+func flowHelp(secs []helpSection, width, minHeight int) []string {
 	avail := width - 1 // one leading space
 	cols := 1
 	for c := helpMaxColumn; c >= 2; c-- {
@@ -260,6 +279,6 @@ func (hm *helpModal) view(w, h int) string {
 	if len(lines) > rows {
 		hint += fmt.Sprintf(" · ↑↓ g G to scroll · %d/%d", min(hm.offset+rows, len(lines)), len(lines))
 	}
-	title := headSortStyle.Render("Help") + hintDescStyle.Render(hint+")")
+	title := helpHeadStyle.Render("Help") + hintDescStyle.Render(hint+")")
 	return panel(title, body, w, h)
 }
