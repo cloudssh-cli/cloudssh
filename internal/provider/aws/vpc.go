@@ -176,10 +176,10 @@ func firstNonEmpty(vals ...string) string {
 }
 
 // subnetLabel names a subnet for a title: its Name tag, else its id (which
-// already says "subnet").
+// already says "subnet"), always prefixed by the service.
 func subnetLabel(ref subnetRef) string {
 	if ref.Name != "" {
-		return "subnet " + ref.Name
+		return origin("vpc", "subnet", ref.Name)
 	}
-	return ref.ID
+	return origin("vpc", "", ref.ID) // the id already says "subnet"
 }

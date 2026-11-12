@@ -254,13 +254,26 @@ func TestTitlesPreferNamesOverIDs(t *testing.T) {
 	if got := (subnets{vpc: "vpc-1"}).Name(); got != "VPC · vpc-1" {
 		t.Errorf("an unnamed VPC shows its id: %q", got)
 	}
-	if got := subnetLabel(subnetRef{ID: "subnet-9", Name: "prod-public-a"}); got != "subnet prod-public-a" {
+	if got := subnetLabel(subnetRef{ID: "subnet-9", Name: "prod-public-a"}); got != "vpc subnet prod-public-a" {
 		t.Errorf("a named subnet: %q", got)
 	}
-	if got := subnetLabel(subnetRef{ID: "subnet-9"}); got != "subnet-9" {
+	if got := subnetLabel(subnetRef{ID: "subnet-9"}); got != "vpc subnet-9" {
 		t.Errorf("an unnamed subnet must not say subnet twice: %q", got)
 	}
 	if got := (instances{sub: "ecs task 45ddf63e"}).Name(); got != "EC2 · ecs task 45ddf63e" {
 		t.Errorf("task title: %q", got)
+	}
+}
+
+func TestDrilledInstanceTitlesAllNameTheServiceTheyCameThrough(t *testing.T) {
+	for want, got := range map[string]string{
+		"EC2 · ecs task 45ddf63e":        (instances{sub: origin("ecs", "task", "45ddf63e")}).Name(),
+		"EC2 · eks node group spot":      (instances{sub: origin("eks", "node group", "spot")}).Name(),
+		"EC2 · asg web":                  (instances{sub: origin("asg", "", "web")}).Name(),
+		"EC2 · vpc subnet prod-public-a": (instances{sub: subnetLabel(subnetRef{ID: "subnet-1", Name: "prod-public-a"})}).Name(),
+	} {
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
 	}
 }

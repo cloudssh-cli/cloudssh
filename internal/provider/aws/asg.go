@@ -72,7 +72,7 @@ func (r asgs) Drill(_ context.Context, row provider.Row) (provider.Drill, error)
 		return provider.Drill{}, fmt.Errorf("no auto scaling group selected")
 	}
 	return provider.Drill{
-		Resource: &instances{p: r.p, sub: "asg " + ref.Name},
+		Resource: &instances{p: r.p, sub: origin("asg", "", ref.Name)},
 		Filters:  []provider.Filter{{Key: "auto-scaling-group", Value: ref.Name}},
 	}, nil
 }

@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"strings"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -93,4 +94,16 @@ func instanceRow(i types.Instance) provider.Row {
 			KeyName: awssdk.ToString(i.KeyName), ImageID: awssdk.ToString(i.ImageId), AZ: az,
 		},
 	}
+}
+
+// origin words the "from" part of a drilled instance list the same way
+// everywhere: "<service> <kind> <name>" (kind may be empty), e.g. "ecs task
+// 45ddf63e" or "eks node group spot", so the title says which service the
+// instances were reached through.
+func origin(service, kind, name string) string {
+	parts := []string{service}
+	if kind != "" {
+		parts = append(parts, kind)
+	}
+	return strings.Join(append(parts, name), " ")
 }
