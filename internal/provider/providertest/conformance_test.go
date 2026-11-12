@@ -165,6 +165,18 @@ func TestSuiteCatchesTheMistakesCommunityCodeMakes(t *testing.T) {
 			toyProvider{[]provider.Resource{drillToy{toyResource{key: "root", cols: goodCols(), pages: goodPages(),
 				drill: func(provider.Row) (provider.Drill, error) { return provider.Drill{}, errors.New("x") }}}}},
 			Options{DrillErrors: []string{"x"}}, "DrillHint must not be empty"},
+		"partial row without an enricher": {
+			toyProvider{[]provider.Resource{toyResource{key: "x", cols: goodCols(), pages: map[string]provider.Page{"": {Rows: []provider.Row{{Cells: []string{"a", "…"}, Ref: 1, ID: "a", Partial: true}}}}}}},
+			Options{}, "does not implement Enricher"},
+		"partial row without an id": {
+			toyProvider{[]provider.Resource{enrichToy{toyResource{key: "x", cols: goodCols(), pages: map[string]provider.Page{"": {Rows: []provider.Row{{Cells: []string{"a", "…"}, Ref: 1, Partial: true}}}}}, func(r provider.Row) provider.Row { return r }}}},
+			Options{}, "needs an ID"},
+		"enrich leaves the row partial": {
+			toyProvider{[]provider.Resource{enrichToy{toyResource{key: "x", cols: goodCols(), pages: map[string]provider.Page{"": {Rows: []provider.Row{{Cells: []string{"a", "…"}, Ref: 1, ID: "a", Partial: true}}}}}, func(r provider.Row) provider.Row { return r }}}},
+			Options{}, "still Partial"},
+		"enrich returns the wrong number of cells": {
+			toyProvider{[]provider.Resource{enrichToy{toyResource{key: "x", cols: goodCols(), pages: map[string]provider.Page{"": {Rows: []provider.Row{{Cells: []string{"a", "…"}, Ref: 1, ID: "a", Partial: true}}}}}, func(r provider.Row) provider.Row { r.Partial, r.Cells = false, []string{"a"}; return r }}}},
+			Options{}, "cells for 2 columns"},
 	}
 	for name, c := range cases {
 		rec := run(c.p, c.o)
@@ -181,5 +193,23 @@ func TestSuiteAllowsDeclaredDrillGuards(t *testing.T) {
 		}}}
 	if rec := run(toyProvider{[]provider.Resource{root}}, Options{DrillErrors: []string{"has no services"}}); len(rec.errs) != 0 {
 		t.Fatalf("declared guards are fine:\n%s", rec.joined())
+	}
+}
+
+// enrichToy adds an Enricher to a toyResource.
+type enrichToy struct {
+	toyResource
+	fn func(provider.Row) provider.Row
+}
+
+func (e enrichToy) Enrich(_ context.Context, r provider.Row) (provider.Row, error) {
+	return e.fn(r), nil
+}
+
+func TestSuiteAcceptsAWellBehavedEnricher(t *testing.T) {
+	res := enrichToy{toyResource{key: "x", cols: goodCols(), pages: map[string]provider.Page{"": {Rows: []provider.Row{{Cells: []string{"a", "…"}, Ref: 1, ID: "a", Partial: true}}}}},
+		func(r provider.Row) provider.Row { r.Partial, r.Cells = false, []string{"a", "full"}; return r }}
+	if rec := run(toyProvider{[]provider.Resource{res}}, Options{WantKeys: []string{"x"}}); len(rec.errs) != 0 {
+		t.Fatalf("a correct enricher should pass:\n%s", rec.joined())
 	}
 }

@@ -9,6 +9,7 @@
 // cloud can do; the UI adapts:
 //
 //	Drillable      a row opens a child resource (e.g. group -> machines)
+//	Enricher       List returns cheap Partial rows; details load later for visible rows only
 //	HostResolver   enrich a Host just before ssh (e.g. default user from the image)
 //	Authenticator  sign-in state, profile list and switching, "how am I signed in"
 //	Authorizer     a short-lived key service (AWS: EC2 Instance Connect)
@@ -34,6 +35,12 @@ type Column struct {
 type Row struct {
 	Cells []string
 	Ref   any
+	// ID is a stable identifier of the row (its name or id). Required when
+	// Partial is set, so the UI can swap in the completed row.
+	ID string
+	// Partial marks a row listed cheaply: only some cells are real (the rest
+	// show a placeholder) and the resource's Enricher fills in the rest. See Enricher.
+	Partial bool
 }
 
 // Page is one page of results. An empty NextToken means no more pages.
@@ -92,6 +99,15 @@ type Drillable interface {
 	// DrillHint describes the action for the key-hint header, e.g. "Subnets View".
 	DrillHint() string
 	Drill(ctx context.Context, row Row) (Drill, error)
+}
+
+// Enricher is optionally implemented by a Resource whose List would otherwise
+// need one extra API call per row (names first, details per item). List returns
+// Partial rows with placeholder cells; the UI then calls Enrich for the rows
+// currently on screen, a few at a time, and fills them in as responses arrive.
+// Enrich must return the complete row (same ID, Partial false, all cells).
+type Enricher interface {
+	Enrich(ctx context.Context, row Row) (Row, error)
 }
 
 // Provider is a cloud backend.

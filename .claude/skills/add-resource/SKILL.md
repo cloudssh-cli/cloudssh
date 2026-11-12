@@ -11,4 +11,6 @@ description: Add a new browsable cloud resource (or provider) to cloudssh with t
 6. **Demo data and tests are part of the resource:** add the resource to `allResources()` in `resources_test.go`, give the demo data rows for it, a `FilterSamples` entry per filter, and an e2e flow; see `.claude/skills/demo-data`. `providertest.Conformance` fails the build otherwise.
 7. `make check`, `make build`, then commit: `feat(<resource>): list <resource>` (+ `test:`/`docs:` as separate commits if large). No co-author trailer.
 
+**Lazy details (`provider.Enricher`):** if filling a column needs one API call per row (EKS `DescribeCluster`), do not call it inside `List`. Return `Partial` rows (placeholder cell `…`, a stable `ID`, a `Ref` carrying what is needed) and implement `Enrich(ctx, row)` to return the whole row. The UI calls it only for rows on screen, a few at a time, and fills cells in as answers arrive. `Drill` on a row that is still partial must fetch what it needs itself. `providertest.Conformance` checks the contract (ID kept, row complete, not still partial).
+
 Known AWS API limits to respect: ECS `DescribeServices` ≤10 ARNs, `DescribeTasks` ≤100, EKS/ECS list calls use `nextToken`.

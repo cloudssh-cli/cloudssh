@@ -223,7 +223,7 @@ func (w *walker) walk(r provider.Resource, filters []provider.Filter, depth int)
 	w.checkMetadata(r)
 	w.visited[r.Key()] = true
 	w.res[r.Key()] = r
-	rows := w.list(r, filters)
+	rows := w.enrich(r, w.list(r, filters))
 	if len(rows) > 0 {
 		w.data[r.Key()] = true
 	}
@@ -280,6 +280,45 @@ func (w *walker) allowed(err error) bool {
 		}
 	}
 	return false
+}
+
+// enrich completes Partial rows through the resource's Enricher, checking that
+// the contract holds: it must exist, keep the ID, and return a whole row.
+func (w *walker) enrich(r provider.Resource, rows []provider.Row) []provider.Row {
+	t := w.t
+	t.Helper()
+	out := make([]provider.Row, len(rows))
+	copy(out, rows)
+	for i, row := range rows {
+		if !row.Partial {
+			continue
+		}
+		if row.ID == "" {
+			t.Errorf("%s: a Partial row needs an ID", r.Key())
+			continue
+		}
+		en, ok := r.(provider.Enricher)
+		if !ok {
+			t.Errorf("%s: returns Partial rows but does not implement Enricher", r.Key())
+			return rows
+		}
+		full, err := en.Enrich(w.ctx, row)
+		switch {
+		case err != nil:
+			t.Errorf("%s: Enrich(%s): %v", r.Key(), row.ID, err)
+		case full.Partial:
+			t.Errorf("%s: Enrich(%s) returned a row that is still Partial", r.Key(), row.ID)
+		case full.ID != row.ID:
+			t.Errorf("%s: Enrich changed the ID %q -> %q", r.Key(), row.ID, full.ID)
+		case len(full.Cells) != len(r.Columns()):
+			t.Errorf("%s: Enrich(%s) returned %d cells for %d columns", r.Key(), row.ID, len(full.Cells), len(r.Columns()))
+		case full.Ref == nil:
+			t.Errorf("%s: Enrich(%s) lost the Ref", r.Key(), row.ID)
+		default:
+			out[i] = full
+		}
+	}
+	return out
 }
 
 // checkFilters proves every filter the resource advertises returns data.

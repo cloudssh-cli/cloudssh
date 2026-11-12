@@ -63,6 +63,14 @@ type authDoneMsg struct {
 	err     error
 }
 
+// enrichedMsg is the result of fetching one partial row's details.
+type enrichedMsg struct {
+	sid, gen int
+	id       string
+	row      provider.Row
+	err      error
+}
+
 // prefetchMsg asks a screen to load its next page in the background.
 type prefetchMsg struct{ sid, gen int }
 
@@ -318,7 +326,51 @@ func (m Model) prefetchTick(s *screen) tea.Cmd {
 	return tea.Tick(time.Duration(m.cfg.PrefetchDelayMs)*time.Millisecond, func(time.Time) tea.Msg { return prefetchMsg{sid, gen} })
 }
 
+// maxEnrichInFlight bounds concurrent detail requests, so scrolling a long
+// list cannot flood the cloud API.
+const maxEnrichInFlight = 4
+
+// enrichVisible starts detail requests for the partial rows now on screen.
+func (m Model) enrichVisible() tea.Cmd {
+	s := m.cur()
+	if s == nil || isProfiles(s) {
+		return nil
+	}
+	en, ok := s.res.(provider.Enricher)
+	if !ok {
+		return nil
+	}
+	var cmds []tea.Cmd
+	for i := s.tbl.top; i < min(s.tbl.top+s.tbl.rowsH(), len(s.view)); i++ {
+		r := s.view[i]
+		if !r.Partial || r.ID == "" || s.enriching[r.ID] || len(s.enriching) >= maxEnrichInFlight {
+			continue
+		}
+		if s.enriching == nil {
+			s.enriching = map[string]bool{}
+		}
+		s.enriching[r.ID] = true
+		sid, gen, row := s.id, s.gen, r
+		cmds = append(cmds, func() tea.Msg {
+			out, err := en.Enrich(context.Background(), row)
+			return enrichedMsg{sid: sid, gen: gen, id: row.ID, row: out, err: err}
+		})
+	}
+	return tea.Batch(cmds...)
+}
+
+// Update runs the message through the model, then starts any detail requests
+// the new screen state needs (rows scrolled into view, new pages, ...).
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	nm := next.(Model)
+	if e := nm.enrichVisible(); e != nil {
+		return nm, tea.Batch(cmd, e)
+	}
+	return nm, cmd
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -388,6 +440,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.setStatus(fmt.Sprintf("%d loaded. No more pages left!", len(s.rows)))
 		}
 		return m, m.setStatus(fmt.Sprintf("%d loaded. Press n for the next page", len(s.rows)))
+
+	case enrichedMsg:
+		s := m.find(msg.sid)
+		if s == nil || msg.gen != s.gen {
+			return m, nil // refreshed or gone
+		}
+		delete(s.enriching, msg.id)
+		var cmd tea.Cmd
+		for i := range s.rows {
+			if s.rows[i].ID != msg.id {
+				continue
+			}
+			if msg.err != nil { // show that it failed, once, instead of retrying forever
+				for k := 1; k < len(s.rows[i].Cells); k++ {
+					s.rows[i].Cells[k] = "?"
+				}
+				s.rows[i].Partial = false
+				cmd = m.setStatus("error: details for " + msg.id + ": " + msg.err.Error())
+			} else {
+				s.rows[i] = msg.row
+			}
+			break
+		}
+		s.refreshView()
+		return m, cmd
 
 	case prefetchMsg:
 		s := m.find(msg.sid)

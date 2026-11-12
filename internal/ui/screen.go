@@ -32,6 +32,8 @@ type screen struct {
 	focusActive bool
 	// budget is how many more pages may still load in the background.
 	budget int
+	// enriching holds the IDs of rows whose details are being fetched.
+	enriching map[string]bool
 }
 
 func newScreen(id int, res provider.Resource, filters []provider.Filter, w, h int) *screen {
@@ -98,6 +100,7 @@ func (s *screen) load(token string, appendRows bool) tea.Cmd {
 
 func (s *screen) reload() tea.Cmd {
 	s.gen++
+	s.enriching = nil
 	s.loading = true
 	s.nextToken = ""
 	return s.load("", false)
