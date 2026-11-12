@@ -177,22 +177,79 @@ func TestStartViewSelectsResource(t *testing.T) {
 	}
 }
 
-func TestHelpListsKeysAndSortColumns(t *testing.T) {
-	m := loaded(t, threeRows())
+func helpFixture(t *testing.T, w, h int) Model {
+	t.Helper()
+	r := filterable(&recorder{})
+	r.cols = []provider.Column{{Title: "ID"}, {Title: "Name"}, {Title: "Private IP"}, {Title: "State"}}
+	m := newModelWith(testCfg(), r, fakeResource{key: "o"})
+	m = sized(settle(m, m.Init()), w, h)
 	m, _ = send(m, key("?"))
 	if m.modal == nil {
 		t.Fatal("help not open")
 	}
-	v := m.View()
-	for _, want := range []string{"Help", "Dashboard", "Sorting", "ID", "Name"} {
+	return m
+}
+
+func TestHelpShowsEverythingUntruncatedWhenThereIsRoom(t *testing.T) {
+	v := helpFixture(t, 120, 30).View()
+	for _, want := range []string{"Table", "Data", "Sorting", "Views", "Filters dialog", "SSH dialog",
+		"pgup pgdn", "(ctrl+b / ctrl+f)", "g  home", "G  end", "I=ID", "N=Name", "P=Private\u00a0IP", "ctrl+t", "ctrl+o", "Connect / cancel"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("help missing %q", want)
 		}
 	}
-	m, _ = send(m, tea.KeyMsg{Type: tea.KeyPgDown}) // the rest is reachable by scrolling
+	if strings.Contains(v, "scroll") {
+		t.Error("nothing should need scrolling at 120x30")
+	}
+	for _, l := range strings.Split(v, "\n") {
+		if strings.Contains(l, "…") {
+			t.Fatalf("no line may be ellipsised: %q", l)
+		}
+	}
+}
+
+func TestHelpWrapsLongDescriptionsInsteadOfCuttingThem(t *testing.T) {
+	// 60 columns => one narrow column, so longer text has to wrap
+	m := helpFixture(t, 60, 60)
+	v := strings.ReplaceAll(m.View(), "\u00a0", " ")
+	flat := strings.Join(strings.Fields(strings.NewReplacer("│", " ", "┌", " ", "┐", " ", "└", " ", "┘", " ", "─", " ").Replace(v)), " ")
+	for _, want := range []string{"Page up / down (ctrl+b / ctrl+f)", "Open row (drill down) / SSH into host", "SSH key / EC2 Instance Connect key"} {
+		if !strings.Contains(flat, want) {
+			t.Errorf("wrapped help lost %q", want)
+		}
+	}
+	for _, l := range strings.Split(v, "\n") {
+		if strings.HasPrefix(l, "│") && strings.Contains(l, "…") { // panel lines only; the header may truncate its own summary
+			t.Errorf("wrapping must replace ellipses: %q", l)
+		}
+	}
+}
+
+func TestHelpScrollsWithGAndHome(t *testing.T) {
+	m := helpFixture(t, 80, 14) // far too small for everything
+	v := m.View()
+	if !strings.Contains(v, "g G to scroll") || !strings.Contains(v, "Table") || strings.Contains(v, "Connect / cancel") {
+		t.Fatalf("small help should start at the top and offer scrolling:\n%s", v)
+	}
+	m, _ = send(m, key("G")) // bottom
+	if v := m.View(); !strings.Contains(v, "Connect / cancel") || strings.Contains(v, "Move selection") {
+		t.Fatalf("G should jump to the bottom:\n%s", v)
+	}
+	m, _ = send(m, key("g")) // top
+	if v := m.View(); !strings.Contains(v, "Move selection") {
+		t.Fatalf("g should jump back to the top:\n%s", v)
+	}
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyEnd})
+	if !strings.Contains(m.View(), "Connect / cancel") {
+		t.Fatal("end should jump to the bottom")
+	}
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyHome})
+	if !strings.Contains(m.View(), "Move selection") {
+		t.Fatal("home should jump to the top")
+	}
 	m, _ = send(m, tea.KeyMsg{Type: tea.KeyPgDown})
-	if !strings.Contains(m.View(), "Update server-side filters") {
-		t.Error("help should scroll to the Data section")
+	if strings.Contains(m.View(), "Move selection") {
+		t.Fatal("pgdn should scroll")
 	}
 	m, cmd := send(m, key("q")) // q closes help, it must not quit
 	if m.modal != nil {
@@ -202,6 +259,43 @@ func TestHelpListsKeysAndSortColumns(t *testing.T) {
 		if _, quit := msg.(tea.QuitMsg); quit {
 			t.Fatal("q in help quit the app")
 		}
+	}
+}
+
+func TestHelpLayoutNeverOverflowsAnyWidth(t *testing.T) {
+	m := helpFixture(t, 120, 30)
+	secs := m.modal.(*helpModal).sections
+	for w := 30; w <= 240; w += 7 {
+		for i, l := range helpLayout(secs, w) {
+			if lipgloss.Width(l) != w {
+				t.Fatalf("width %d: line %d is %d wide: %q", w, i, lipgloss.Width(l), l)
+			}
+		}
+	}
+	// wide terminals use more columns, so they need fewer lines
+	if narrow, wide := len(helpLayout(secs, 60)), len(helpLayout(secs, 200)); wide >= narrow {
+		t.Fatalf("wide layout (%d lines) should be shorter than narrow (%d)", wide, narrow)
+	}
+}
+
+func TestBestSplitBalancesColumns(t *testing.T) {
+	blocks := [][]string{make([]string, 10), make([]string, 7), make([]string, 6), make([]string, 5), make([]string, 6), make([]string, 5)}
+	g := bestSplit(blocks, 2)
+	if len(g) != 2 || len(g[0])+len(g[1]) != 6 {
+		t.Fatalf("groups: %v", g)
+	}
+	height := func(ix []int) int {
+		h := 0
+		for _, i := range ix {
+			h += len(blocks[i])
+		}
+		return h - 1
+	}
+	if h0, h1 := height(g[0]), height(g[1]); max(h0, h1) > 22 {
+		t.Fatalf("unbalanced: %d / %d", h0, h1)
+	}
+	if g1 := bestSplit(blocks[:1], 3); len(g1) != 3 {
+		t.Fatal("must always return one group per column")
 	}
 }
 

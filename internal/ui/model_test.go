@@ -506,3 +506,23 @@ func TestTunnelCombinesWithTemporaryKey(t *testing.T) {
 		t.Fatal("the temporary key must still be pushed to the instance")
 	}
 }
+
+func TestGAndShiftGJumpToTopAndBottomOfTheTable(t *testing.T) {
+	m := loaded(t, fakeResource{pages: map[string]provider.Page{"": {Rows: rows("a", "b", "c", "d", "e")}}})
+	m, _ = send(m, key("G"))
+	if m.cur().tbl.cursor != 4 {
+		t.Fatalf("G: cursor=%d", m.cur().tbl.cursor)
+	}
+	m, _ = send(m, key("g"))
+	if m.cur().tbl.cursor != 0 {
+		t.Fatalf("g: cursor=%d", m.cur().tbl.cursor)
+	}
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyEnd})
+	if m.cur().tbl.cursor != 4 {
+		t.Fatalf("end: cursor=%d", m.cur().tbl.cursor)
+	}
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyHome})
+	if m.cur().tbl.cursor != 0 {
+		t.Fatalf("home: cursor=%d", m.cur().tbl.cursor)
+	}
+}
