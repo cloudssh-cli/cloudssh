@@ -193,7 +193,7 @@ func helpFixture(t *testing.T, w, h int) Model {
 func TestHelpShowsEverythingUntruncatedWhenThereIsRoom(t *testing.T) {
 	v := helpFixture(t, 120, 30).View()
 	for _, want := range []string{"Table", "Data", "Sorting", "Views", "Filters dialog", "SSH dialog",
-		"pgup pgdn", "(ctrl+b / ctrl+f)", "g  home", "G  end", "I=ID", "N=Name", "P=Private\u00a0IP", "ctrl+t", "ctrl+o", "Connect / cancel"} {
+		"pgup pgdn", "(ctrl+b / ctrl+f)", "g  home", "G  end", "I=ID", "N=Name", "P=Private\u00a0IP", "Move between fields", "Change a choice", "Connect / cancel"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("help missing %q", want)
 		}
@@ -213,7 +213,7 @@ func TestHelpWrapsLongDescriptionsInsteadOfCuttingThem(t *testing.T) {
 	m := helpFixture(t, 60, 60)
 	v := strings.ReplaceAll(m.View(), "\u00a0", " ")
 	flat := strings.Join(strings.Fields(strings.NewReplacer("│", " ", "┌", " ", "┐", " ", "└", " ", "┘", " ", "─", " ").Replace(v)), " ")
-	for _, want := range []string{"Page up / down (ctrl+b / ctrl+f)", "Open row (drill down) / SSH into host", "SSH key / temporary key (when offered)"} {
+	for _, want := range []string{"Page up / down (ctrl+b / ctrl+f)", "Open row (drill down) / SSH into host", "Move between fields: user, address, method, route"} {
 		if !strings.Contains(flat, want) {
 			t.Errorf("wrapped help lost %q", want)
 		}
@@ -366,7 +366,9 @@ func TestFiltersModalCancelAndClearAll(t *testing.T) {
 		t.Fatal("esc must cancel without changing filters")
 	}
 	m, _ = send(m, key("F"))
-	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlX})
+	for i := 0; i < len("running"); i++ { // clear the one filter by deleting its text
+		m, _ = send(m, tea.KeyMsg{Type: tea.KeyBackspace})
+	}
 	m, cmd := send(m, key("enter"))
 	m = settle(m, cmd)
 	if len(rec.last().Filters) != 0 || len(m.cur().filters) != 0 {
@@ -553,5 +555,20 @@ func TestHeaderListsOnlyActionShortcuts(t *testing.T) {
 		if lipgloss.Width(l) > 70 {
 			t.Fatalf("overflow: %q", l)
 		}
+	}
+}
+
+func TestSearchSaysItOnlySeesLoadedRowsWhileMorePagesExist(t *testing.T) {
+	m := loaded(t, threeRows()) // has a next page
+	m, _ = send(m, key("/"))
+	m = typeKeys(m, "alp")
+	m, _ = send(m, key("enter"))
+	m, _ = send(m, clearStatusMsg{seq: m.statusSeq})
+	if v := m.View(); !strings.Contains(v, "rows loaded so far") || !strings.Contains(v, "load more") {
+		t.Fatalf("footer should explain the limit:\n%s", v)
+	}
+	m, _ = send(m, key("esc")) // search cleared: no note
+	if strings.Contains(m.View(), "loaded so far") {
+		t.Fatal("no note without a search")
 	}
 }

@@ -99,11 +99,6 @@ func (fm *filtersModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 	case "down", "tab":
 		fm.move(1)
 		return false, fm.sync()
-	case "ctrl+x": // clear every value
-		for i := range fm.inputs {
-			fm.inputs[i].SetValue("")
-		}
-		return false, nil
 	}
 	if len(fm.inputs) == 0 {
 		return false, nil
@@ -120,8 +115,8 @@ func (fm *filtersModal) view(w, h int) string {
 	}
 	footer := []string{
 		"",
-		hintDescStyle.Render("  enter apply · esc cancel · ↑↓/tab move · ctrl+x clear all"),
-		hintDescStyle.Render("  empty rows are ignored; matches are partial unless the filter is an ID"),
+		hintDescStyle.Render("  enter apply · esc cancel · ↑↓ or tab to move"),
+		hintDescStyle.Render("  empty rows are ignored; R in the table resets all filters"),
 	}
 	// the dialog needs: border(2) + blank(1) + rows + footer
 	room := max(h-2-1-len(footer), 1)

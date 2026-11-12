@@ -138,9 +138,10 @@ func TestSSHDialogSwitchesIPAndCancels(t *testing.T) {
 	if !strings.Contains(m.View(), "ssh ubuntu@10.0.0.1") {
 		t.Fatal("default should be the private IP")
 	}
-	m, _ = send(m, key("tab"))
+	m, _ = send(m, key("tab")) // to the Address field
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyRight})
 	if !strings.Contains(m.View(), "ssh ubuntu@3.3.3.3") {
-		t.Fatal("tab should switch to the public IP")
+		t.Fatal("tab then right should switch to the public IP")
 	}
 	m, _ = send(m, key("esc"))
 	if m.modal != nil {
@@ -315,22 +316,24 @@ func authModel(t *testing.T, cfg config.Config, auth *fakeAuthProvider) Model {
 func TestSSHDialogOffersMethodOnlyWhenProviderSupportsIt(t *testing.T) {
 	plain := loaded(t, threeRows())
 	plain, _ = send(plain, resolvedMsg{host: provider.Host{PrivateIP: "10.0.0.1"}})
-	if strings.Contains(plain.View(), "Instance Connect") || strings.Contains(plain.View(), "ctrl+t") {
+	if strings.Contains(plain.View(), "Instance Connect") || strings.Contains(plain.View(), "Method") {
 		t.Fatal("no method choice without an Authorizer")
 	}
-	plain, _ = send(plain, tea.KeyMsg{Type: tea.KeyCtrlT}) // must be inert
+	plain, _ = send(plain, key("tab")) // no extra fields: these must be inert
+	plain, _ = send(plain, tea.KeyMsg{Type: tea.KeyRight})
 	if plain.modal == nil {
-		t.Fatal("ctrl+t must not close the dialog")
+		t.Fatal("tab and arrows must not close the dialog")
 	}
 
 	m := authModel(t, testCfg(), &fakeAuthProvider{})
 	v := m.View()
-	for _, want := range []string{"Connect using:", "Fake Connect", "ctrl+t switch method", "ssh ubuntu@10.0.0.1"} {
+	for _, want := range []string{"Method", "Fake Connect", "tab next", "ssh ubuntu@10.0.0.1"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("dialog missing %q", want)
 		}
 	}
-	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlT})
+	m, _ = send(m, key("tab"))
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyRight})
 	if v := m.View(); !strings.Contains(v, "<temporary key>") || !strings.Contains(v, "IdentitiesOnly=yes") {
 		t.Fatalf("preview should show the temporary key command:\n%s", v)
 	}
@@ -358,7 +361,8 @@ func TestInstanceConnectPushesKeyThenRunsSSHAndCleansUp(t *testing.T) {
 	}
 	auth := &fakeAuthProvider{}
 	m := authModel(t, testCfg(), auth)
-	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlT})
+	m, _ = send(m, key("tab"))
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyRight})
 	m, cmd := send(m, key("enter"))
 	if m.modal != nil || !strings.Contains(m.status, "temporary key") {
 		t.Fatalf("modal=%v status=%q", m.modal, m.status)
@@ -391,7 +395,8 @@ func TestInstanceConnectFailureCleansUpAndReports(t *testing.T) {
 	}
 	auth := &fakeAuthProvider{err: errors.New("AccessDenied")}
 	m := authModel(t, testCfg(), auth)
-	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlT})
+	m, _ = send(m, key("tab"))
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyRight})
 	m, cmd := send(m, key("enter"))
 	var res tempKeyMsg
 	for _, msg := range run(cmd) {
@@ -442,12 +447,13 @@ func TestSSHDialogOffersRunningTunnel(t *testing.T) {
 	m := loaded(t, threeRows())
 	m, _ = send(m, resolvedMsg{host: tunnelHost(), tunnels: []sshx.LocalTunnel{{Port: 2222, RemotePort: 22, InstanceID: "i-1"}}})
 	v := m.View()
-	for _, want := range []string{"Connect via:", "Running tunnel", "127.0.0.1:2222", "ctrl+o use tunnel", "ssh ubuntu@10.0.0.1"} {
+	for _, want := range []string{"Route", "Running tunnel", "127.0.0.1:2222", "tab next", "ssh ubuntu@10.0.0.1"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("dialog missing %q", want)
 		}
 	}
-	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlO})
+	m, _ = send(m, key("tab"))
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyRight})
 	v = m.View()
 	for _, want := range []string{"-p 2222", "HostKeyAlias=i-1", "ServerAliveInterval=5", "ubuntu@127.0.0.1"} {
 		if !strings.Contains(v, want) {
@@ -463,12 +469,13 @@ func TestSSHDialogOffersRunningTunnel(t *testing.T) {
 func TestTunnelOptionHiddenAndInertWithoutAMatchingTunnel(t *testing.T) {
 	m := loaded(t, threeRows())
 	m, _ = send(m, resolvedMsg{host: tunnelHost()})
-	if strings.Contains(m.View(), "Connect via") || strings.Contains(m.View(), "ctrl+o") {
+	if strings.Contains(m.View(), "Route") || strings.Contains(m.View(), "Running tunnel") {
 		t.Fatal("no tunnel option without a running tunnel")
 	}
-	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlO})
+	m, _ = send(m, key("tab"))
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyRight})
 	if m.modal == nil || m.modal.(*sshModal).viaTunnel {
-		t.Fatal("ctrl+o must be inert")
+		t.Fatal("arrows must be inert without a tunnel")
 	}
 }
 
@@ -482,8 +489,10 @@ func TestTunnelCombinesWithTemporaryKey(t *testing.T) {
 		host:    provider.Host{ID: "i-1", AZ: "us-east-1a", PrivateIP: "10.0.0.1", DefaultUser: "ubuntu"},
 		tunnels: []sshx.LocalTunnel{{Port: 2222, RemotePort: 22, InstanceID: "i-1"}},
 	})
-	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlT})
-	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlO})
+	m, _ = send(m, key("tab"))
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyRight})
+	m, _ = send(m, key("tab"))
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyRight})
 	_, cmd := send(m, key("enter"))
 	var ready tempKeyMsg
 	for _, msg := range run(cmd) {

@@ -90,13 +90,11 @@ func helpSections(m *Model) []helpSection {
 		helpSection{"Filters dialog (F)", []helpEntry{
 			{"type", "Fill in the filters you want"},
 			{"↑ ↓  tab", "Move between filters"},
-			{"ctrl+x", "Clear all values"},
 			{"enter  esc", "Apply / cancel"},
 		}},
 		helpSection{"SSH dialog (S)", []helpEntry{
-			{"tab", "Switch private / public IP"},
-			{"ctrl+t", "SSH key / temporary key (when offered)"},
-			{"ctrl+o", "Direct / your running tunnel"},
+			{"tab  ↑ ↓", "Move between fields: user, address, method, route"},
+			{"← →", "Change a choice on its row (address, method, route)"},
 			{"enter  esc", "Connect / cancel"},
 		}},
 	)

@@ -19,7 +19,8 @@ const authTimeout = 20 * time.Second
 
 // sshModal lets the user pick the user, IP and method, preview
 // the command, then hand the terminal to ssh. When the provider can push a
-// temporary key (e.g. EC2 Instance Connect on AWS) the method can be switched with ctrl+t.
+// temporary key (e.g. EC2 Instance Connect on AWS) or a tunnel is running, those
+// choices appear as extra fields. tab moves between fields, left/right change a choice.
 type sshModal struct {
 	host   provider.Host
 	user   textinput.Model
@@ -32,6 +33,59 @@ type sshModal struct {
 
 	tunnels   []sshx.LocalTunnel // tunnels the user already runs that lead to this host
 	viaTunnel bool               // connect through tunnels[0] instead of directly
+
+	focus int // index into fields()
+}
+
+// sshField is one row of the dialog.
+type sshField int
+
+const (
+	fieldUser sshField = iota
+	fieldAddress
+	fieldMethod
+	fieldRoute
+)
+
+// fields lists the rows that apply to this host, in tab order.
+func (sm *sshModal) fields() []sshField {
+	out := []sshField{fieldUser}
+	if sm.both {
+		out = append(out, fieldAddress)
+	}
+	if sm.auth != nil {
+		out = append(out, fieldMethod)
+	}
+	if len(sm.tunnels) > 0 {
+		out = append(out, fieldRoute)
+	}
+	return out
+}
+
+func (sm *sshModal) current() sshField {
+	f := sm.fields()
+	return f[min(sm.focus, len(f)-1)]
+}
+
+func (sm *sshModal) move(d int) tea.Cmd {
+	n := len(sm.fields())
+	sm.focus = (sm.focus + d + n) % n
+	if sm.current() == fieldUser {
+		return sm.user.Focus()
+	}
+	sm.user.Blur()
+	return nil
+}
+
+func (sm *sshModal) toggle(f sshField) {
+	switch f {
+	case fieldAddress:
+		sm.public = !sm.public
+	case fieldMethod:
+		sm.viaAuth = !sm.viaAuth
+	case fieldRoute:
+		sm.viaTunnel = !sm.viaTunnel
+	}
 }
 
 func newSSHModal(h provider.Host, cfg config.Config, auth provider.Authorizer, tunnels []sshx.LocalTunnel) (*sshModal, tea.Cmd) {
@@ -92,21 +146,15 @@ func (sm *sshModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		return true, nil
-	case "tab":
-		if sm.both {
-			sm.public = !sm.public
+	case "tab", "down":
+		return false, sm.move(1)
+	case "shift+tab", "up":
+		return false, sm.move(-1)
+	case "left", "right", " ":
+		if sm.current() != fieldUser { // on a choice these change it; in the user box they edit
+			sm.toggle(sm.current())
+			return false, nil
 		}
-		return false, nil
-	case "ctrl+t":
-		if sm.auth != nil {
-			sm.viaAuth = !sm.viaAuth
-		}
-		return false, nil
-	case "ctrl+o":
-		if len(sm.tunnels) > 0 {
-			sm.viaTunnel = !sm.viaTunnel
-		}
-		return false, nil
 	case "enter":
 		if sm.viaAuth {
 			return true, tea.Batch(m.setStatus("pushing a temporary key via "+sm.auth.AuthLabel()+"..."), sm.authorize())
@@ -115,8 +163,11 @@ func (sm *sshModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 		if err != nil {
 			return true, m.setStatus("error: " + err.Error())
 		}
-		// ExecProcess suspends the TUI and gives ssh the real terminal.
+		// the terminal is handed to ssh on a cleared screen
 		return true, execSession(m.command(t), func(err error) tea.Msg { return sshDoneMsg{err} })
+	}
+	if sm.current() != fieldUser {
+		return false, nil // typing only goes into the user box
 	}
 	var cmd tea.Cmd
 	sm.user, cmd = sm.user.Update(msg)
@@ -183,32 +234,30 @@ func (sm *sshModal) preview() string {
 }
 
 func (sm *sshModal) view(w, h int) string {
-	label := lipgloss.NewStyle().Foreground(colAccent)
-	body := []string{"", label.Render(" Connect using user:"), " " + sm.user.View(), ""}
+	label := func(f sshField, text string) string {
+		if sm.current() == f {
+			return hintKeyStyle.Render("▶ ") + headSortStyle.Render(text)
+		}
+		return "  " + lipgloss.NewStyle().Foreground(colAccent).Render(text)
+	}
+	body := []string{"", label(fieldUser, "User"), "  " + sm.user.View(), ""}
 	if sm.both {
-		body = append(body, label.Render(" Connect using IP:"),
-			" "+radio(!sm.public, "Private", sm.host.PrivateIP)+"   "+radio(sm.public, "Public", sm.host.PublicIP), "")
+		body = append(body, label(fieldAddress, "Address"),
+			"  "+radio(!sm.public, "Private", sm.host.PrivateIP)+"   "+radio(sm.public, "Public", sm.host.PublicIP), "")
 	}
 	if sm.auth != nil {
-		body = append(body, label.Render(" Connect using:"),
-			" "+radio(!sm.viaAuth, "SSH key", "your keys / agent")+"   "+radio(sm.viaAuth, sm.auth.AuthLabel(), "temporary key"), "")
+		body = append(body, label(fieldMethod, "Method"),
+			"  "+radio(!sm.viaAuth, "SSH key", "your keys / agent")+"   "+radio(sm.viaAuth, sm.auth.AuthLabel(), "temporary key"), "")
 	}
 	if len(sm.tunnels) > 0 {
-		tun := sm.tunnels[0]
-		body = append(body, label.Render(" Connect via:"),
-			" "+radio(!sm.viaTunnel, "Direct", sm.addr())+"   "+radio(sm.viaTunnel, "Running tunnel", "127.0.0.1:"+strconv.Itoa(tun.Port)), "")
+		body = append(body, label(fieldRoute, "Route"),
+			"  "+radio(!sm.viaTunnel, "Direct", sm.addr())+"   "+radio(sm.viaTunnel, "Running tunnel", "127.0.0.1:"+strconv.Itoa(sm.tunnels[0].Port)), "")
 	}
 	hints := "enter connect · esc cancel"
-	if sm.both {
-		hints += " · tab switch IP"
+	if len(sm.fields()) > 1 {
+		hints = "tab next · ← → change · " + hints
 	}
-	if sm.auth != nil {
-		hints += " · ctrl+t switch method"
-	}
-	if len(sm.tunnels) > 0 {
-		hints += " · ctrl+o use tunnel"
-	}
-	body = append(body, label.Render(" Final ssh command preview:"), " "+sm.preview(), "", hintDescStyle.Render(" "+hints))
+	body = append(body, "  "+lipgloss.NewStyle().Foreground(colAccent).Render("Command"), "  "+sm.preview(), "", hintDescStyle.Render("  "+hints))
 	bw := 0
 	for _, l := range body {
 		bw = max(bw, lipgloss.Width(l))

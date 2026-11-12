@@ -873,6 +873,9 @@ func (m Model) footer(s *screen) string {
 	switch {
 	case strings.HasPrefix(msg, "error"):
 		st = errorStyle
+	case s != nil && s.search != "" && s.nextToken != "": // outranks transient load messages, never errors
+		// search only looks at rows already loaded; say so instead of leaving a "missing" match unexplained
+		st, msg = warnStyle, fmt.Sprintf("Searching the %d rows loaded so far. Press n to load more.", len(s.rows))
 	case msg == "" && m.authErr != nil:
 		st, msg = warnStyle, authHeadline(m.authErr) // stays until signed in
 		if m.hasProfiles {
