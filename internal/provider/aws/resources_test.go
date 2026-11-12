@@ -268,7 +268,7 @@ func TestTitlesPreferNamesOverIDs(t *testing.T) {
 func TestDrilledInstanceTitlesAllNameTheServiceTheyCameThrough(t *testing.T) {
 	for want, got := range map[string]string{
 		"EC2 · ecs task 45ddf63e":        (instances{sub: origin("ecs", "task", "45ddf63e")}).Name(),
-		"EC2 · eks node group spot":      (instances{sub: origin("eks", "node group", "spot")}).Name(),
+		"EC2 · eks mng spot":             (instances{sub: origin("eks", "mng", "spot")}).Name(),
 		"EC2 · asg web":                  (instances{sub: origin("asg", "", "web")}).Name(),
 		"EC2 · vpc subnet prod-public-a": (instances{sub: subnetLabel(subnetRef{ID: "subnet-1", Name: "prod-public-a"})}).Name(),
 	} {

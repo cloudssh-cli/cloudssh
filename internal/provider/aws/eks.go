@@ -205,7 +205,7 @@ func (r eksNodeGroups) Drill(ctx context.Context, row provider.Row) (provider.Dr
 		return provider.Drill{}, errors.New("node group has no auto scaling group")
 	}
 	return provider.Drill{
-		Resource: &instances{p: r.p, sub: origin("eks", "node group", ref.Name)},
+		Resource: &instances{p: r.p, sub: origin("eks", "mng", ref.Name)},
 		Filters:  []provider.Filter{{Key: "auto-scaling-group", Value: ref.ASG}},
 	}, nil
 }
