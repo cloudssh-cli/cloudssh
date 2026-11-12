@@ -1,11 +1,10 @@
 package aws
 
 import (
-	"strings"
-
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/SVMadhavaReddy/cloudssh/internal/query"
 )
 
 // filterSpec maps a UI filter to an EC2 API filter name.
@@ -30,35 +29,6 @@ func defsOf(specs []filterSpec) []provider.FilterDef {
 	return out
 }
 
-// parseValue reads a filter value: an optional leading "&" (every item must
-// match) or "|" (any item, the default), then comma-separated items. An item
-// starting with "!" is an exclusion.
-//
-//	web,api      web or api          &web,prod   web and prod
-//	|web,api     the same, explicit   web,!canary web, but not canary
-func parseValue(v string) (include, exclude []string, all bool) {
-	v = strings.TrimSpace(v)
-	switch {
-	case strings.HasPrefix(v, "&"):
-		all, v = true, v[1:]
-	case strings.HasPrefix(v, "|"):
-		v = v[1:]
-	}
-	for _, p := range strings.Split(v, ",") {
-		p = strings.TrimSpace(p)
-		switch {
-		case p == "":
-		case strings.HasPrefix(p, "!"):
-			if rest := strings.TrimSpace(p[1:]); rest != "" {
-				exclude = append(exclude, rest)
-			}
-		default:
-			include = append(include, p)
-		}
-	}
-	return include, exclude, all
-}
-
 func (s filterSpec) wrap(v string) string {
 	if s.exact {
 		return v
@@ -66,24 +36,23 @@ func (s filterSpec) wrap(v string) string {
 	return "*" + v + "*"
 }
 
-// buildFilters converts the positive part of UI filters to EC2 filters
-// ("a,b" becomes two values the API ORs, which for "&a,b" is a superset).
-// Empty values and unknown keys are skipped; "!" exclusions and "&" (and) are
-// verified afterwards by dropMismatched because the EC2 API can express
-// neither.
+// buildFilters converts the positive part of UI filters to EC2 filters: one
+// value per OR alternative (its first term), which is a superset the API can
+// apply. Anything it cannot express (AND, NOT) is checked afterwards by
+// dropMismatched. Empty values and unknown keys are skipped.
 func buildFilters(specs []filterSpec, fs []provider.Filter) []types.Filter {
 	var out []types.Filter
 	for _, f := range fs {
-		include, _, _ := parseValue(f.Value)
-		if len(include) == 0 {
+		terms := query.Parse(f.Value).ServerTerms()
+		if len(terms) == 0 {
 			continue
 		}
 		for _, s := range specs {
 			if s.key != f.Key {
 				continue
 			}
-			vals := make([]string, len(include))
-			for i, v := range include {
+			vals := make([]string, len(terms))
+			for i, v := range terms {
 				vals[i] = s.wrap(v)
 			}
 			name := s.api
@@ -94,57 +63,43 @@ func buildFilters(specs []filterSpec, fs []provider.Filter) []types.Filter {
 	return out
 }
 
-// dropMismatched keeps the items that satisfy what the API could not check:
-// every item of an "&" list, and none of the "!" exclusions.
+// dropMismatched keeps the items that satisfy the full query of every filter,
+// for the parts the API could not check (AND within an alternative, NOT).
 func dropMismatched[T any](items []T, specs []filterSpec, fs []provider.Filter, field func(T, string) ([]string, bool)) []T {
 	type rule struct {
-		api       string
-		must, not []string
+		api  string
+		spec filterSpec
+		expr query.Expr
 	}
 	var rules []rule
 	for _, f := range fs {
-		include, exclude, all := parseValue(f.Value)
+		expr := query.Parse(f.Value)
+		if expr.Empty() || expr.ExactOnServer() {
+			continue
+		}
 		for _, s := range specs {
-			if s.key != f.Key || (!all && len(exclude) == 0) {
-				continue
+			if s.key == f.Key {
+				rules = append(rules, rule{api: s.api, spec: s, expr: expr})
 			}
-			r := rule{api: s.api}
-			if all {
-				for _, v := range include {
-					r.must = append(r.must, s.wrap(v))
-				}
-			}
-			for _, v := range exclude {
-				r.not = append(r.not, s.wrap(v))
-			}
-			rules = append(rules, r)
 		}
 	}
 	if len(rules) == 0 {
 		return items
-	}
-	anyMatch := func(pattern string, have []string) bool {
-		for _, h := range have {
-			if wild(pattern, h) {
-				return true
-			}
-		}
-		return false
 	}
 	out := items[:0:0]
 next:
 	for _, it := range items {
 		for _, r := range rules {
 			have, _ := field(it, r.api)
-			for _, v := range r.must {
-				if !anyMatch(v, have) {
-					continue next
+			if !r.expr.Match(func(term string) bool {
+				for _, h := range have {
+					if wild(r.spec.wrap(term), h) {
+						return true
+					}
 				}
-			}
-			for _, v := range r.not {
-				if anyMatch(v, have) {
-					continue next
-				}
+				return false
+			}) {
+				continue next
 			}
 		}
 		out = append(out, it)

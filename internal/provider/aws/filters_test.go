@@ -9,19 +9,6 @@ import (
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
 
-func TestParseValueSeparatesOrAndNot(t *testing.T) {
-	inc, exc, all := parseValue(" web , api ,!canary, ! test ,, !")
-	if !reflect.DeepEqual(inc, []string{"web", "api"}) || !reflect.DeepEqual(exc, []string{"canary", "test"}) || all {
-		t.Fatalf("include=%v exclude=%v all=%v", inc, exc, all)
-	}
-	if inc, _, all = parseValue("&web,prod"); !all || !reflect.DeepEqual(inc, []string{"web", "prod"}) {
-		t.Fatalf("& means every item: %v %v", inc, all)
-	}
-	if inc, _, all = parseValue("|web,api"); all || !reflect.DeepEqual(inc, []string{"web", "api"}) {
-		t.Fatalf("| is explicit or: %v %v", inc, all)
-	}
-}
-
 func TestBuildFiltersTurnsCommasIntoAlternativesAndSkipsNegations(t *testing.T) {
 	got := buildFilters(ec2Specs, []provider.Filter{
 		{Key: "instance-name", Value: "web,api"},     // two alternatives, partial match
@@ -68,17 +55,17 @@ func TestInstanceListUnderstandsOrAndNot(t *testing.T) {
 	if len(not) == 0 {
 		t.Fatal("bastion and friends should remain")
 	}
-	and := names(provider.Filter{Key: "instance-name", Value: "&web,prod"})
+	and := names(provider.Filter{Key: "instance-name", Value: "web prod"})
 	if len(and) != 4 {
 		t.Fatalf("web and prod: %v", and)
 	}
-	if none := names(provider.Filter{Key: "instance-name", Value: "&web,api"}); len(none) != 0 {
+	if none := names(provider.Filter{Key: "instance-name", Value: "web&api"}); len(none) != 0 {
 		t.Fatalf("no name has both web and api: %v", none)
 	}
-	if mixedAnd := names(provider.Filter{Key: "instance-name", Value: "&web,prod,!web-prod-4"}); len(mixedAnd) != 3 {
+	if mixedAnd := names(provider.Filter{Key: "instance-name", Value: "web prod !web-prod-4"}); len(mixedAnd) != 3 {
 		t.Fatalf("and with a not: %v", mixedAnd)
 	}
-	if explicit := names(provider.Filter{Key: "instance-name", Value: "|web-prod-1,web-prod-2"}); len(explicit) != 2 {
+	if explicit := names(provider.Filter{Key: "instance-name", Value: "web-prod-1|web-prod-2"}); len(explicit) != 2 {
 		t.Fatalf("explicit or: %v", explicit)
 	}
 	notState := names(provider.Filter{Key: "state", Value: "!running"})

@@ -56,7 +56,7 @@ func helpSections(m *Model) []helpSection {
 			{"/ f s", "search"}, {"F", "filters"}, {"r", "refresh"}, {"R", "reset filters, search, sort"}, {"n", "next page"},
 		}},
 		{title: "Search & filters", entries: []helpEntry{
-			{"a|b", "search: a or b"}, {"!a", "search: not a"}, {"a,b", "filter: a or b"}, {"&a,b", "filter: a and b"}, {"!a", "filter: not a"},
+			{"a b  a&b", "and"}, {"a|b  a,b", "or"}, {"!a", "not"}, {"", "same syntax in search and in filters"},
 		}},
 	}
 	if s := m.cur(); s != nil {

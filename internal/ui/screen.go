@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/SVMadhavaReddy/cloudssh/internal/query"
 )
 
 // screen is one level of a mode's navigation stack: a resource, the filters
@@ -164,31 +165,7 @@ func (s *screen) filterChips(width int) string {
 }
 
 // matchSearch reports whether text (already lower-case) satisfies the search
-// query (lower-case). "a|b" means a or b; spaces inside an alternative mean
-// and; a leading "!" negates a term ("web !canary"). A query with no usable
-// term matches everything.
-func matchSearch(query, text string) bool {
-	any := false
-	for _, alt := range strings.Split(query, "|") {
-		ok, used := true, false
-		for _, term := range strings.Fields(alt) {
-			neg := strings.HasPrefix(term, "!")
-			term = strings.TrimPrefix(term, "!")
-			if term == "" {
-				continue
-			}
-			used = true
-			if strings.Contains(text, term) == neg {
-				ok = false
-				break
-			}
-		}
-		if used {
-			any = true
-			if ok {
-				return true
-			}
-		}
-	}
-	return !any
+// query (lower-case); the grammar is shared with filters (see internal/query).
+func matchSearch(q, text string) bool {
+	return query.Parse(q).Match(func(term string) bool { return strings.Contains(text, term) })
 }
