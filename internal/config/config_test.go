@@ -38,7 +38,7 @@ func TestLoadOverridesAndClampsPageSize(t *testing.T) {
 
 func TestViewAndSplashDefaultsAndOverride(t *testing.T) {
 	d := Default()
-	if d.View != "ec2" || d.SkipSplash {
+	if d.View != "" || d.SkipSplash {
 		t.Fatalf("defaults: %+v", d)
 	}
 	p := filepath.Join(t.TempDir(), "c.yaml")
@@ -60,10 +60,10 @@ func TestSSHMethodDefaultAndValidation(t *testing.T) {
 	}
 	dir := t.TempDir()
 	good := filepath.Join(dir, "good.yaml")
-	if err := os.WriteFile(good, []byte("ssh_method: instance-connect\n"), 0o600); err != nil {
+	if err := os.WriteFile(good, []byte("ssh_method: temporary-key\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if cfg, err := Load(good, true); err != nil || cfg.SSHMethod != "instance-connect" {
+	if cfg, err := Load(good, true); err != nil || cfg.SSHMethod != SSHMethodTemporaryKey {
 		t.Fatalf("good: %+v %v", cfg, err)
 	}
 	bad := filepath.Join(dir, "bad.yaml")

@@ -10,6 +10,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// The values ssh_method / --ssh-method accept.
+const (
+	SSHMethodSSH          = "ssh"
+	SSHMethodTemporaryKey = "temporary-key"
+)
+
+// ValidSSHMethod reports whether s is an accepted ssh_method value.
+func ValidSSHMethod(s string) bool { return s == SSHMethodSSH || s == SSHMethodTemporaryKey }
+
 type Config struct {
 	Cloud        string `yaml:"cloud"`
 	Profile      string `yaml:"profile"`
@@ -17,11 +26,13 @@ type Config struct {
 	PemFilesPath string `yaml:"pem_files_path"`
 	DefaultIP    string `yaml:"default_ip_type"` // "private" or "public"
 	PageSize     int32  `yaml:"page_size"`
-	// View is the screen opened at start: "dashboard" or a resource key (ec2, ecs, eks, asg, vpc).
+	// View is the screen opened at start: "dashboard" or a resource key of the
+	// chosen cloud. Empty (or unknown) opens the cloud's first resource.
 	View       string `yaml:"view"`
 	SkipSplash bool   `yaml:"skip_splash"`
-	// SSHMethod is the default connection method: "ssh" (your keys) or
-	// "instance-connect" (temporary key pushed through the cloud, e.g. EC2 Instance Connect).
+	// SSHMethod is the default connection method: SSHMethodSSH (your keys) or
+	// SSHMethodTemporaryKey (a short-lived key pushed through the cloud's own
+	// service, when the cloud offers one).
 	SSHMethod string `yaml:"ssh_method"`
 }
 
@@ -32,8 +43,8 @@ func Default() Config {
 		PemFilesPath: "~/.cloudssh/pems",
 		DefaultIP:    "private",
 		PageSize:     50,
-		View:         "ec2",
-		SSHMethod:    "ssh",
+		View:         "",
+		SSHMethod:    SSHMethodSSH,
 	}
 }
 
@@ -60,8 +71,8 @@ func Load(path string, explicit bool) (Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
 	}
-	if cfg.SSHMethod != "ssh" && cfg.SSHMethod != "instance-connect" {
-		return cfg, fmt.Errorf("ssh_method %q must be \"ssh\" or \"instance-connect\"", cfg.SSHMethod)
+	if !ValidSSHMethod(cfg.SSHMethod) {
+		return cfg, fmt.Errorf("ssh_method %q must be %q or %q", cfg.SSHMethod, SSHMethodSSH, SSHMethodTemporaryKey)
 	}
 	if cfg.PageSize < 5 {
 		cfg.PageSize = 5
