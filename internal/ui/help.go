@@ -121,7 +121,9 @@ func renderSection(sec helpSection, w int) []string {
 	kw = min(kw, min(helpMaxKeyW, w/3))
 	descW := max(w-2-kw-2, 8)
 
-	out := []string{headStyle.Render(fit(sec.title, w))}
+	// a ruled heading ("── Table ─────") so sections read as separate blocks
+	rule := max(w-lipgloss.Width(sec.title)-4, 0)
+	out := []string{hintDescStyle.Render("── ") + headStyle.Render(sec.title) + hintDescStyle.Render(" "+strings.Repeat("─", rule))}
 	for _, e := range sec.entries {
 		keys, desc := wrap(e.key, kw), wrap(e.desc, descW)
 		for i := 0; i < max(len(keys), len(desc)); i++ {
@@ -140,7 +142,7 @@ func renderSection(sec helpSection, w int) []string {
 
 // helpLayout flows the sections into columns that fit width and returns the
 // finished lines (each exactly width wide).
-func helpLayout(secs []helpSection, width int) []string {
+func helpLayout(secs []helpSection, width, minHeight int) []string {
 	avail := width - 1 // one leading space
 	cols := 1
 	for c := helpMaxColumn; c >= 2; c-- {
@@ -165,7 +167,7 @@ func helpLayout(secs []helpSection, width int) []string {
 			columns[c] = columns[c][:n-1]
 		}
 	}
-	height := 0
+	height := minHeight // pad so the column divider runs the full height
 	for _, c := range columns {
 		height = max(height, len(c))
 	}
@@ -179,7 +181,8 @@ func helpLayout(secs []helpSection, width int) []string {
 			}
 			parts[c] = fit(l, colW)
 		}
-		lines[r] = fit(" "+strings.Join(parts, strings.Repeat(" ", helpGap)), width)
+		// a thin divider between columns keeps them from running together
+		lines[r] = fit(" "+strings.Join(parts, hintDescStyle.Render(" │ ")), width)
 	}
 	return lines
 }
@@ -255,7 +258,7 @@ func (hm *helpModal) key(_ *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 
 func (hm *helpModal) view(w, h int) string {
 	inner, rows := max(w-2, 1), max(h-2, 1)
-	lines := helpLayout(hm.sections, inner)
+	lines := helpLayout(hm.sections, inner, rows)
 	hm.offset = min(hm.offset, max(len(lines)-rows, 0))
 	end := min(hm.offset+rows, len(lines))
 	body := append([]string(nil), lines[hm.offset:end]...)

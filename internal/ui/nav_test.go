@@ -266,14 +266,14 @@ func TestHelpLayoutNeverOverflowsAnyWidth(t *testing.T) {
 	m := helpFixture(t, 120, 30)
 	secs := m.modal.(*helpModal).sections
 	for w := 30; w <= 240; w += 7 {
-		for i, l := range helpLayout(secs, w) {
+		for i, l := range helpLayout(secs, w, 0) {
 			if lipgloss.Width(l) != w {
 				t.Fatalf("width %d: line %d is %d wide: %q", w, i, lipgloss.Width(l), l)
 			}
 		}
 	}
 	// wide terminals use more columns, so they need fewer lines
-	if narrow, wide := len(helpLayout(secs, 60)), len(helpLayout(secs, 200)); wide >= narrow {
+	if narrow, wide := len(helpLayout(secs, 60, 0)), len(helpLayout(secs, 200, 0)); wide >= narrow {
 		t.Fatalf("wide layout (%d lines) should be shorter than narrow (%d)", wide, narrow)
 	}
 }
