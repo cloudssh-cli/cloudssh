@@ -19,7 +19,7 @@ const authTimeout = 20 * time.Second
 
 // sshModal lets the user pick the user, IP and method, preview
 // the command, then hand the terminal to ssh. When the provider can push a
-// temporary key (EC2 Instance Connect) the method can be switched with ctrl+t.
+// temporary key (e.g. EC2 Instance Connect on AWS) the method can be switched with ctrl+t.
 type sshModal struct {
 	host   provider.Host
 	user   textinput.Model
@@ -38,18 +38,14 @@ func newSSHModal(h provider.Host, cfg config.Config, auth provider.Authorizer, t
 	in := textinput.New()
 	in.Prompt = ""
 	in.Width = 30
-	in.Placeholder = "Username"
-	user := h.DefaultUser
-	if user == "" {
-		user = "ec2-user"
-	}
-	in.SetValue(user)
+	in.Placeholder = "(ssh default)"
+	in.SetValue(h.DefaultUser) // the provider fills this in from the machine image; blank = ssh default
 	in.CursorEnd()
 	sm := &sshModal{
 		host: h, user: in, both: h.PrivateIP != "" && h.PublicIP != "",
 		pemDir:  config.ExpandHome(cfg.PemFilesPath),
 		auth:    auth,
-		viaAuth: auth != nil && cfg.SSHMethod == "instance-connect",
+		viaAuth: auth != nil && cfg.SSHMethod == config.SSHMethodTemporaryKey,
 		tunnels: tunnels,
 	}
 	switch {
@@ -120,7 +116,7 @@ func (sm *sshModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 			return true, m.setStatus("error: " + err.Error())
 		}
 		// ExecProcess suspends the TUI and gives ssh the real terminal.
-		return true, tea.ExecProcess(t.Command(), func(err error) tea.Msg { return sshDoneMsg{err} })
+		return true, tea.ExecProcess(m.command(t), func(err error) tea.Msg { return sshDoneMsg{err} })
 	}
 	var cmd tea.Cmd
 	sm.user, cmd = sm.user.Update(msg)
@@ -137,18 +133,18 @@ func (sm *sshModal) authorize() tea.Cmd {
 		defer cancel()
 		key, err := sshx.NewTempKey(ctx)
 		if err != nil {
-			return eicMsg{err: err}
+			return tempKeyMsg{err: err}
 		}
 		if err := auth.AuthorizeSSH(ctx, host, user, key.Public); err != nil {
-			return eicMsg{key: key, err: err}
+			return tempKeyMsg{key: key, err: err}
 		}
 		host.KeyName = "" // the temporary key replaces any pem file
 		t, err := sshx.Resolve(host, user, pref, "")
 		if err != nil {
-			return eicMsg{key: key, err: err}
+			return tempKeyMsg{key: key, err: err}
 		}
 		t.KeyFile, t.OnlyKey = key.Path, true
-		return eicMsg{target: snapshot.withTunnel(t), key: key}
+		return tempKeyMsg{target: snapshot.withTunnel(t), key: key}
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -114,15 +115,13 @@ func TestEnterResolvesHostThenSSHDialog(t *testing.T) {
 		t.Fatalf("got %#v", got)
 	}
 	m, _ = send(m, got)
-	sm, ok := m.modal.(*sshModal)
-	if !ok {
+	if _, ok := m.modal.(*sshModal); !ok {
 		t.Fatalf("modal=%T", m.modal)
 	}
-	if !strings.Contains(m.View(), "ssh ec2-user@10.0.0.1") {
+	if !strings.Contains(m.View(), "ssh 10.0.0.1") {
 		t.Fatalf("preview missing:\n%s", m.View())
 	}
-	// typing edits the user and the preview follows
-	sm.user.SetValue("")
+	// typing sets the user and the preview follows
 	m = typeKeys(m, "ops")
 	if !strings.Contains(m.View(), "ssh ops@10.0.0.1") {
 		t.Fatal("preview did not follow username")
@@ -337,16 +336,16 @@ func TestSSHDialogOffersMethodOnlyWhenProviderSupportsIt(t *testing.T) {
 	}
 }
 
-func TestConfigDefaultsToInstanceConnect(t *testing.T) {
+func TestConfigCanDefaultToTheTemporaryKey(t *testing.T) {
 	cfg := testCfg()
-	cfg.SSHMethod = "instance-connect"
+	cfg.SSHMethod = config.SSHMethodTemporaryKey
 	m := authModel(t, cfg, &fakeAuthProvider{})
 	if !m.modal.(*sshModal).viaAuth || !strings.Contains(m.View(), "<temporary key>") {
-		t.Fatal("ssh_method: instance-connect should preselect the temporary key")
+		t.Fatal("ssh_method: temporary-key should preselect the temporary key")
 	}
 	// but a provider without the capability falls back to plain ssh
 	plain := loaded(t, threeRows())
-	plain.cfg.SSHMethod = "instance-connect"
+	plain.cfg.SSHMethod = config.SSHMethodTemporaryKey
 	plain, _ = send(plain, resolvedMsg{host: provider.Host{PrivateIP: "10.0.0.1"}})
 	if plain.modal.(*sshModal).viaAuth {
 		t.Fatal("must not select a method the provider lacks")
@@ -364,9 +363,9 @@ func TestInstanceConnectPushesKeyThenRunsSSHAndCleansUp(t *testing.T) {
 	if m.modal != nil || !strings.Contains(m.status, "temporary key") {
 		t.Fatalf("modal=%v status=%q", m.modal, m.status)
 	}
-	var ready eicMsg
+	var ready tempKeyMsg
 	for _, msg := range run(cmd) {
-		if e, ok := msg.(eicMsg); ok {
+		if e, ok := msg.(tempKeyMsg); ok {
 			ready = e
 		}
 	}
@@ -382,7 +381,7 @@ func TestInstanceConnectPushesKeyThenRunsSSHAndCleansUp(t *testing.T) {
 		t.Fatalf("ssh args: %s", args)
 	}
 	if _, cmd = send(m, ready); cmd == nil {
-		t.Fatal("eicMsg should start ssh")
+		t.Fatal("tempKeyMsg should start ssh")
 	}
 }
 
@@ -394,9 +393,9 @@ func TestInstanceConnectFailureCleansUpAndReports(t *testing.T) {
 	m := authModel(t, testCfg(), auth)
 	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlT})
 	m, cmd := send(m, key("enter"))
-	var res eicMsg
+	var res tempKeyMsg
 	for _, msg := range run(cmd) {
-		if e, ok := msg.(eicMsg); ok {
+		if e, ok := msg.(tempKeyMsg); ok {
 			res = e
 		}
 	}
@@ -486,9 +485,9 @@ func TestTunnelCombinesWithTemporaryKey(t *testing.T) {
 	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlT})
 	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlO})
 	_, cmd := send(m, key("enter"))
-	var ready eicMsg
+	var ready tempKeyMsg
 	for _, msg := range run(cmd) {
-		if e, ok := msg.(eicMsg); ok {
+		if e, ok := msg.(tempKeyMsg); ok {
 			ready = e
 		}
 	}
@@ -524,5 +523,33 @@ func TestGAndShiftGJumpToTopAndBottomOfTheTable(t *testing.T) {
 	m, _ = send(m, tea.KeyMsg{Type: tea.KeyHome})
 	if m.cur().tbl.cursor != 0 {
 		t.Fatalf("home: cursor=%d", m.cur().tbl.cursor)
+	}
+}
+
+// demoProvider is a provider running on sample data.
+type demoProvider struct{ fakeProvider }
+
+func (demoProvider) Demo() bool { return true }
+
+func TestDemoModeIsMarkedAndNeverStartsRealSSH(t *testing.T) {
+	res := fakeResource{pages: map[string]provider.Page{"": {Rows: rows("a")}}}
+	m := sized(New(testCfg(), demoProvider{fakeProvider{res: []provider.Resource{res}}}), 120, 30)
+	m = settle(m, m.Init())
+	if v := m.View(); !strings.Contains(v, "DEMO (sample data)") {
+		t.Fatalf("the header must say this is a demo:\n%s", v)
+	}
+	if m.detectTunnels != nil {
+		t.Error("demo mode has no real tunnels to look for")
+	}
+	target := sshx.Target{User: "ubuntu", Address: "10.0.0.1"}
+	if got := m.command(target); filepath.Base(got.Path) != "sh" || !strings.Contains(strings.Join(got.Args, " "), "[demo mode]") {
+		t.Fatalf("demo connection must be the local shell, got %v", got.Args)
+	}
+	real := newModel(fakeResource{})
+	if got := real.command(target); got.Args[0] != "ssh" {
+		t.Fatalf("a normal session runs ssh, got %v", got.Args)
+	}
+	if strings.Contains(real.View(), "DEMO") {
+		t.Error("only demo sessions are marked")
 	}
 }

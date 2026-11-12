@@ -1,6 +1,7 @@
 package sshx
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -95,5 +96,34 @@ func TestArgsTunnelPortAndOptions(t *testing.T) {
 	want := "-p 4242 -o HostKeyAlias=i-1 -o ServerAliveInterval=5 -i /k -o IdentitiesOnly=yes ubuntu@127.0.0.1"
 	if got != want {
 		t.Fatalf("args:\n got %s\nwant %s", got, want)
+	}
+}
+
+func TestDemoCommandShowsTheCommandAndRunsOnlyALocalShell(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("no sh on this machine")
+	}
+	cmd := Target{User: "ubuntu", Address: "10.0.1.5", KeyFile: "/tmp/my key.pem"}.DemoCommand()
+	if filepath.Base(cmd.Path) != "sh" {
+		t.Fatalf("demo mode must never start ssh, it starts %s", cmd.Path)
+	}
+	cmd.Stdin = strings.NewReader("echo reached-the-local-shell\nexit\n")
+	var out bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &out
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("demo shell: %v\n%s", err, out.String())
+	}
+	for _, want := range []string{"[demo mode]", "ssh -i '/tmp/my key.pem' ubuntu@10.0.1.5", "Nothing is sent anywhere", "reached-the-local-shell"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output lacks %q:\n%s", want, out.String())
+		}
+	}
+}
+
+func TestShellQuote(t *testing.T) {
+	for in, want := range map[string]string{"plain": "plain", "ubuntu@10.0.0.1": "ubuntu@10.0.0.1", "a b": "'a b'", "it's": `'it'\''s'`, "$(x)": "'$(x)'"} {
+		if got := shellQuote(in); got != want {
+			t.Errorf("shellQuote(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

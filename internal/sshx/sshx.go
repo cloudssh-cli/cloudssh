@@ -7,7 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
@@ -41,6 +43,9 @@ func (t Target) Args() []string {
 			args = append(args, "-o", "IdentitiesOnly=yes")
 		}
 	}
+	if t.User == "" {
+		return append(args, t.Address) // ssh then uses its own default user
+	}
 	return append(args, t.User+"@"+t.Address)
 }
 
@@ -62,10 +67,7 @@ func Resolve(h provider.Host, user, preferIP, pemDir string) (Target, error) {
 		return Target{}, errors.New("host has no reachable IP address")
 	}
 	if user == "" {
-		user = h.DefaultUser
-	}
-	if user == "" {
-		user = "ec2-user"
+		user = h.DefaultUser // set by the provider (e.g. from the machine image); may stay empty
 	}
 	t := Target{User: user, Address: addr}
 	if h.KeyName != "" {
@@ -75,4 +77,40 @@ func Resolve(h provider.Host, user, preferIP, pemDir string) (Target, error) {
 		}
 	}
 	return t, nil
+}
+
+var safeArg = regexp.MustCompile(`^[A-Za-z0-9@%+=:,./_-]+$`)
+
+// shellQuote quotes s for display in a shell command line.
+func shellQuote(s string) string {
+	if safeArg.MatchString(s) {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// DemoCommand is what an ssh session becomes in demo mode (cloudssh --demo):
+// a banner showing the command that would have run, then a local shell with
+// a prompt for the pretend host. Nothing is sent anywhere.
+func (t Target) DemoCommand() *exec.Cmd {
+	parts := make([]string, len(t.Args()))
+	for i, a := range t.Args() {
+		parts[i] = shellQuote(a)
+	}
+	line := "ssh " + strings.Join(parts, " ")
+
+	shell := "exec sh -i"
+	if _, err := exec.LookPath("bash"); err == nil {
+		shell = "exec bash --noprofile --norc -i"
+	}
+	script := `printf '\n  [demo mode] cloudssh would have run:\n\n    %s\n\n  Nothing is sent anywhere: this is a local shell. Type exit to return to cloudssh.\n\n' "$1"; ` + shell
+
+	who := t.User
+	if who == "" {
+		who = "demo"
+	}
+	cmd := exec.Command("sh", "-c", script, "demo", line) //nolint:gosec // fixed script; the target only appears as a printf argument
+	cmd.Env = append(os.Environ(), `PS1=\[\033[1;32m\]`+who+"@"+t.Address+`\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]\$ `)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	return cmd
 }

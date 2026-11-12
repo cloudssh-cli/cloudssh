@@ -4,6 +4,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -48,9 +49,9 @@ type resolvedMsg struct {
 	err     error
 }
 
-// eicMsg is the result of pushing a temporary key (EC2 Instance Connect):
+// tempKeyMsg is the result of pushing a temporary key through the cloud:
 // on success the model runs ssh with that key and deletes it afterwards.
-type eicMsg struct {
+type tempKeyMsg struct {
 	target sshx.Target
 	key    sshx.TempKey
 	err    error
@@ -96,6 +97,7 @@ type Model struct {
 	authErr     error
 	prevMode    int  // where to return after the profiles screen
 	hasProfiles bool // profiles exist on this machine (shows the p shortcut)
+	demo        bool // sample data: mark the header, never start a real ssh
 
 	status    string
 	statusSeq int
@@ -113,6 +115,9 @@ func New(cfg config.Config, p provider.Provider) Model {
 	}
 	m.stacks = make([][]*screen, len(m.resources)+2) // 0 dashboard, 1..n resources, n+1 profiles
 	m.mode = m.startMode()
+	if d, ok := p.(provider.Demoer); ok && d.Demo() {
+		m.demo, m.detectTunnels = true, nil // nothing real to tunnel to
+	}
 	if a, ok := p.(provider.Authenticator); ok {
 		m.auth, m.authErr = a, a.AuthError()
 		m.hasProfiles = len(a.Profiles()) > 0
@@ -289,6 +294,15 @@ func (m *Model) useProfile(name string) tea.Cmd {
 	})
 }
 
+// command is the process to run for a connection: real ssh, or in demo mode a
+// harmless local shell.
+func (m *Model) command(t sshx.Target) *exec.Cmd {
+	if m.demo {
+		return t.DemoCommand()
+	}
+	return t.Command()
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -393,13 +407,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.modal = sm
 		return m, cmd
 
-	case eicMsg:
+	case tempKeyMsg:
 		if msg.err != nil {
 			msg.key.Cleanup()
 			return m, m.setStatus("error: " + msg.err.Error())
 		}
 		key := msg.key
-		return m, tea.ExecProcess(msg.target.Command(), func(err error) tea.Msg {
+		return m, tea.ExecProcess(m.command(msg.target), func(err error) tea.Msg {
 			key.Cleanup() // the temporary key never outlives the session
 			return sshDoneMsg{err}
 		})
@@ -532,7 +546,7 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "r":
 		if isProfiles(s) && m.authErr != nil {
-			// e.g. the user ran `aws sso login` in another terminal: try again
+			// e.g. the user logged in from another terminal: try again
 			retry := m.useProfile(m.auth.Profile())
 			return m, tea.Batch(s.reload(), retry)
 		}
@@ -683,7 +697,11 @@ func (m Model) connect(s *screen) (tea.Model, tea.Cmd) {
 // ---- view ----
 
 func (m Model) infos() []info {
-	out := []info{{"Cloud", m.prov.Name()}}
+	cloudName := m.prov.Name()
+	if m.demo {
+		cloudName += " · DEMO (sample data)"
+	}
+	out := []info{{"Cloud", cloudName}}
 	if m.auth != nil {
 		// how we are signed in: "profile prod · SSO", "environment keys", "instance role", ...
 		access := m.auth.Access()
@@ -800,7 +818,7 @@ func (m Model) profilesEmpty() string {
 	if m.authErr != nil {
 		return m.authErr.Error() + "\n\n" +
 			"There are no profiles on this machine yet. That is completely normal if you\n" +
-			"have not used the AWS CLI before, and setting one up takes a minute.\n" +
+			"have not set one up before, and it only takes a minute (see the steps above).\n" +
 			"Once you are set up, press r to try again."
 	}
 	return "No profiles are configured on this machine.\n" +

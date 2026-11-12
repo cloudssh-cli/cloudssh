@@ -213,7 +213,7 @@ func TestHelpWrapsLongDescriptionsInsteadOfCuttingThem(t *testing.T) {
 	m := helpFixture(t, 60, 60)
 	v := strings.ReplaceAll(m.View(), "\u00a0", " ")
 	flat := strings.Join(strings.Fields(strings.NewReplacer("│", " ", "┌", " ", "┐", " ", "└", " ", "┘", " ", "─", " ").Replace(v)), " ")
-	for _, want := range []string{"Page up / down (ctrl+b / ctrl+f)", "Open row (drill down) / SSH into host", "SSH key / EC2 Instance Connect key"} {
+	for _, want := range []string{"Page up / down (ctrl+b / ctrl+f)", "Open row (drill down) / SSH into host", "SSH key / temporary key (when offered)"} {
 		if !strings.Contains(flat, want) {
 			t.Errorf("wrapped help lost %q", want)
 		}

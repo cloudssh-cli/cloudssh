@@ -95,7 +95,7 @@ func helpSections(m *Model) []helpSection {
 		}},
 		helpSection{"SSH dialog (S)", []helpEntry{
 			{"tab", "Switch private / public IP"},
-			{"ctrl+t", "SSH key / EC2 Instance Connect key"},
+			{"ctrl+t", "SSH key / temporary key (when offered)"},
 			{"ctrl+o", "Direct / your running tunnel"},
 			{"enter  esc", "Connect / cancel"},
 		}},
