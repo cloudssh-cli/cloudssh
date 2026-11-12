@@ -66,9 +66,9 @@ func newHelp(m *Model) *helpModal {
 		"")
 
 	add(helpHeading("Filters dialog (F)"),
+		helpEntry("type", "Every available filter is listed; fill in the ones you want"),
 		helpEntry("↑ ↓ / tab", "Move between filters"),
-		helpEntry("ctrl+n / ctrl+p", "Change the kind of the selected filter"),
-		helpEntry("ctrl+a / ctrl+d", "Add / delete a filter"),
+		helpEntry("ctrl+x", "Clear all values"),
 		helpEntry("enter / esc", "Apply / cancel"),
 		"",
 		helpHeading("SSH dialog"),

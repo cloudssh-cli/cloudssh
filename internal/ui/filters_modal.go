@@ -10,66 +10,66 @@ import (
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
 
-type filterRow struct {
-	def int
-	in  textinput.Model
-}
-
-// filtersModal edits a screen's server-side filters (the Python app's F screen).
+// filtersModal edits a screen's server-side filters. Every filter the
+// resource supports gets its own row, so there is nothing to cycle through:
+// move to a row, type a value, enter applies. Empty rows are ignored.
 type filtersModal struct {
-	sid   int
-	defs  []provider.FilterDef
-	rows  []filterRow
-	focus int
+	sid    int
+	defs   []provider.FilterDef
+	inputs []textinput.Model // one per def
+	focus  int
+	offset int // first visible row when the list is taller than the dialog
 }
 
 func newFiltersModal(s *screen) (*filtersModal, tea.Cmd) {
 	defs := append([]provider.FilterDef(nil), s.res.Filters()...)
-	index := func(key string) int {
-		for i, d := range defs {
-			if d.Key == key {
-				return i
-			}
-		}
-		// a drill can apply a filter the list doesn't advertise; keep it visible
-		defs = append(defs, provider.FilterDef{Key: key, Name: key})
-		return len(defs) - 1
-	}
-	fm := &filtersModal{sid: s.id}
+	active := map[string]string{}
 	for _, f := range s.filters {
-		fm.rows = append(fm.rows, filterRow{def: index(f.Key), in: newValueInput(f.Value)})
+		active[f.Key] = f.Value
+		known := false
+		for _, d := range defs {
+			known = known || d.Key == f.Key
+		}
+		if !known {
+			// a drill can apply a filter the list doesn't advertise; keep it editable
+			defs = append(defs, provider.FilterDef{Key: f.Key, Name: f.Key})
+		}
 	}
-	fm.defs = defs
-	if len(fm.rows) == 0 && len(defs) > 0 {
-		fm.rows = append(fm.rows, filterRow{def: 0, in: newValueInput("")})
+	fm := &filtersModal{sid: s.id, defs: defs}
+	for _, d := range defs {
+		in := textinput.New()
+		in.Prompt = ""
+		in.Width = 32
+		in.Placeholder = "(any)"
+		in.SetValue(active[d.Key])
+		in.CursorEnd()
+		fm.inputs = append(fm.inputs, in)
+	}
+	// start on the first filter that is already set, else the first row
+	for i, in := range fm.inputs {
+		if in.Value() != "" {
+			fm.focus = i
+			break
+		}
 	}
 	return fm, fm.sync()
-}
-
-func newValueInput(v string) textinput.Model {
-	in := textinput.New()
-	in.Prompt = ""
-	in.Width = 30
-	in.SetValue(v)
-	in.CursorEnd()
-	return in
 }
 
 // sync focuses only the active row's input.
 func (fm *filtersModal) sync() tea.Cmd {
 	var cmd tea.Cmd
-	for i := range fm.rows {
+	for i := range fm.inputs {
 		if i == fm.focus {
-			cmd = fm.rows[i].in.Focus()
+			cmd = fm.inputs[i].Focus()
 		} else {
-			fm.rows[i].in.Blur()
+			fm.inputs[i].Blur()
 		}
 	}
 	return cmd
 }
 
 func (fm *filtersModal) move(d int) {
-	if n := len(fm.rows); n > 0 {
+	if n := len(fm.inputs); n > 0 {
 		fm.focus = (fm.focus + d + n) % n
 	}
 }
@@ -80,9 +80,9 @@ func (fm *filtersModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 		return true, nil
 	case "enter":
 		var fs []provider.Filter
-		for _, r := range fm.rows {
-			if v := strings.TrimSpace(r.in.Value()); v != "" {
-				fs = append(fs, provider.Filter{Key: fm.defs[r.def].Key, Value: v})
+		for i, in := range fm.inputs {
+			if v := strings.TrimSpace(in.Value()); v != "" {
+				fs = append(fs, provider.Filter{Key: fm.defs[i].Key, Value: v})
 			}
 		}
 		s := m.find(fm.sid)
@@ -99,49 +99,17 @@ func (fm *filtersModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 	case "down", "tab":
 		fm.move(1)
 		return false, fm.sync()
-	case "ctrl+n", "ctrl+p":
-		if len(fm.rows) == 0 || len(fm.defs) == 0 {
-			return false, nil
+	case "ctrl+x": // clear every value
+		for i := range fm.inputs {
+			fm.inputs[i].SetValue("")
 		}
-		d := 1
-		if msg.String() == "ctrl+p" {
-			d = -1
-		}
-		r := &fm.rows[fm.focus]
-		r.def = (r.def + d + len(fm.defs)) % len(fm.defs)
-		r.in.SetValue("") // a new filter kind starts empty, like the Python app
 		return false, nil
-	case "ctrl+a":
-		if len(fm.defs) == 0 {
-			return false, nil
-		}
-		used := map[int]bool{}
-		for _, r := range fm.rows {
-			used[r.def] = true
-		}
-		next := 0
-		for i := range fm.defs {
-			if !used[i] {
-				next = i
-				break
-			}
-		}
-		fm.rows = append(fm.rows, filterRow{def: next, in: newValueInput("")})
-		fm.focus = len(fm.rows) - 1
-		return false, fm.sync()
-	case "ctrl+d":
-		if len(fm.rows) == 0 {
-			return false, nil
-		}
-		fm.rows = append(fm.rows[:fm.focus], fm.rows[fm.focus+1:]...)
-		fm.focus = min(fm.focus, max(len(fm.rows)-1, 0))
-		return false, fm.sync()
 	}
-	if len(fm.rows) == 0 {
+	if len(fm.inputs) == 0 {
 		return false, nil
 	}
 	var cmd tea.Cmd
-	fm.rows[fm.focus].in, cmd = fm.rows[fm.focus].in.Update(msg)
+	fm.inputs[fm.focus], cmd = fm.inputs[fm.focus].Update(msg)
 	return false, cmd
 }
 
@@ -150,32 +118,38 @@ func (fm *filtersModal) view(w, h int) string {
 	for _, d := range fm.defs {
 		label = max(label, lipgloss.Width(d.Name))
 	}
-	var body []string
-	body = append(body, "")
-	if len(fm.rows) == 0 {
-		body = append(body, hintDescStyle.Render("  No filters. Press ctrl+a to add one."))
+	footer := []string{
+		"",
+		hintDescStyle.Render("  enter apply · esc cancel · ↑↓/tab move · ctrl+x clear all"),
+		hintDescStyle.Render("  empty rows are ignored; matches are partial unless the filter is an ID"),
 	}
-	for i, r := range fm.rows {
-		mark := "  "
-		if i == fm.focus {
-			mark = hintKeyStyle.Render("▶ ")
-		}
-		name := fit(fm.defs[r.def].Name, label)
-		if i == fm.focus {
-			name = headSortStyle.Render(name)
-		} else {
-			name = infoValStyle.Render(name)
-		}
-		body = append(body, mark+name+"  "+r.in.View())
+	// the dialog needs: border(2) + blank(1) + rows + footer
+	room := max(h-2-1-len(footer), 1)
+	fm.offset = min(max(fm.offset, fm.focus-room+1), fm.focus)
+	fm.offset = min(fm.offset, max(len(fm.defs)-room, 0))
+
+	body := []string{""}
+	if len(fm.defs) == 0 {
+		body = append(body, hintDescStyle.Render("  This resource has no filters."))
 	}
-	body = append(body, "",
-		hintDescStyle.Render("  enter apply · esc cancel · ↑↓/tab rows · ctrl+n/ctrl+p filter kind"),
-		hintDescStyle.Render("  ctrl+a add filter · ctrl+d delete filter · empty values are ignored"))
+	end := min(fm.offset+room, len(fm.defs))
+	for i := fm.offset; i < end; i++ {
+		mark, name := "  ", infoValStyle.Render(fit(fm.defs[i].Name, label))
+		if i == fm.focus {
+			mark, name = hintKeyStyle.Render("▶ "), headSortStyle.Render(fit(fm.defs[i].Name, label))
+		}
+		body = append(body, mark+name+"  "+fm.inputs[i].View())
+	}
+	body = append(body, footer...)
+
 	bw := 0
 	for _, l := range body {
 		bw = max(bw, lipgloss.Width(l))
 	}
 	bw = min(bw+4, w)
 	title := lipgloss.NewStyle().Bold(true).Foreground(colPrimary).Render("Update data filters")
+	if len(fm.defs) > room {
+		title += hintDescStyle.Render("  (scroll with ↑↓)")
+	}
 	return placeCenter(panel(title, body, bw, len(body)+2), w, h)
 }

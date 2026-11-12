@@ -30,7 +30,7 @@ Start on a specific screen with `--view dashboard|ec2|ecs|eks|asg|vpc`. Press `?
 | `esc` | clear search, then go back one level |
 | `S` | SSH dialog: user, private/public IP, command preview |
 | `/` `f` `s` | search loaded rows (`↑↓` in the box recall previous searches) |
-| `F` | server-side filters (name, state, type, AZ, IPs, ASG, …); `ctrl+n/p` kind, `ctrl+a/d` add/delete |
+| `F` | server-side filters: every filter (name, state, type, AZ, IPs, ASG, …) is listed, fill in the ones you want; `ctrl+x` clears all |
 | `shift`+letter | sort by a column, again to reverse (letters listed in `?`) |
 | `r` · `R` | refresh · reset filters, search and sort to defaults |
 | `n` `shift+→` | load next page |

@@ -222,69 +222,65 @@ func filterable(rec *recorder) fakeResource {
 	}
 }
 
+func TestFiltersModalListsEveryFilterAtOnce(t *testing.T) {
+	rec := &recorder{}
+	m := newModelWith(testCfg(), filterable(rec))
+	m = settle(m, m.Init())
+	m, _ = send(m, key("F"))
+	v := m.View()
+	for _, want := range []string{"Update data filters", "Instance Name", "Instance State", "AZ", "running", "(any)"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("modal missing %q", want)
+		}
+	}
+	if fm := m.modal.(*filtersModal); fm.defs[fm.focus].Key != "state" {
+		t.Fatalf("focus should start on the filter that is already set, got %s", fm.defs[fm.focus].Key)
+	}
+}
+
 func TestFiltersModalAppliesAndReloads(t *testing.T) {
 	rec := &recorder{}
 	m := newModelWith(testCfg(), filterable(rec))
 	m = settle(m, m.Init())
 	m, _ = send(m, key("F"))
-	fm, ok := m.modal.(*filtersModal)
-	if !ok || len(fm.rows) != 1 || fm.defs[fm.rows[0].def].Key != "state" {
-		t.Fatalf("modal=%T", m.modal)
-	}
-	v := m.View()
-	for _, want := range []string{"Update data filters", "Instance State", "running"} {
-		if !strings.Contains(v, want) {
-			t.Errorf("modal missing %q", want)
-		}
-	}
-	m = typeKeys(m, "x") // edit the value -> "runningx"
-	m, _ = send(m, key("ctrl+a"))
-	if len(fm.rows) != 2 || fm.defs[fm.rows[1].def].Key != "name" {
-		t.Fatalf("ctrl+a should add the first unused filter, rows=%d", len(fm.rows))
-	}
-	m = typeKeys(m, "web")
+	m = typeKeys(m, "x") // state: running -> runningx
+	m, _ = send(m, key("up"))
+	m = typeKeys(m, "web") // name
 	m, cmd := send(m, key("enter"))
 	if m.modal != nil {
 		t.Fatal("enter should close the modal")
 	}
 	m = settle(m, cmd)
 	q := rec.last()
-	if len(q.Filters) != 2 || q.Filters[0] != (provider.Filter{Key: "state", Value: "runningx"}) || q.Filters[1] != (provider.Filter{Key: "name", Value: "web"}) {
+	want := []provider.Filter{{Key: "name", Value: "web"}, {Key: "state", Value: "runningx"}}
+	if len(q.Filters) != 2 || q.Filters[0] != want[0] || q.Filters[1] != want[1] {
 		t.Fatalf("applied filters: %+v", q.Filters)
 	}
-	if !strings.Contains(m.View(), "Instance State=runningx") {
+	if !strings.Contains(m.View(), "Instance Name=web") {
 		t.Fatal("header should summarise active filters")
 	}
 }
 
-func TestFiltersModalKindDeleteCancelAndClear(t *testing.T) {
+func TestFiltersModalCancelAndClearAll(t *testing.T) {
 	rec := &recorder{}
 	m := newModelWith(testCfg(), filterable(rec))
 	m = settle(m, m.Init())
 	m, _ = send(m, key("F"))
-	fm := m.modal.(*filtersModal)
-	m, _ = send(m, key("ctrl+n")) // state -> az, value cleared
-	if fm.defs[fm.rows[0].def].Key != "az" || fm.rows[0].in.Value() != "" {
-		t.Fatalf("ctrl+n: def=%d value=%q", fm.rows[0].def, fm.rows[0].in.Value())
-	}
-	m, _ = send(m, key("ctrl+d")) // delete the only row
-	if len(fm.rows) != 0 || !strings.Contains(m.View(), "No filters") {
-		t.Fatal("expected empty filter list")
-	}
+	m = typeKeys(m, "zzz")
 	m, _ = send(m, key("esc"))
-	if m.modal != nil || len(m.cur().filters) != 1 {
+	if m.modal != nil || m.cur().filters[0].Value != "running" {
 		t.Fatal("esc must cancel without changing filters")
 	}
 	m, _ = send(m, key("F"))
-	m, _ = send(m, key("ctrl+d"))
-	m, cmd := send(m, key("enter")) // applying zero rows clears all filters
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlX})
+	m, cmd := send(m, key("enter"))
 	m = settle(m, cmd)
 	if len(rec.last().Filters) != 0 || len(m.cur().filters) != 0 {
 		t.Fatalf("filters not cleared: %+v", rec.last().Filters)
 	}
 }
 
-func TestFiltersModalToleratesUnknownActiveFilter(t *testing.T) {
+func TestFiltersModalKeepsUnknownActiveFilterEditable(t *testing.T) {
 	rec := &recorder{}
 	res := filterable(rec)
 	res.defaults = []provider.Filter{{Key: "subnet-id", Value: "subnet-1"}} // not in Filters()
@@ -292,11 +288,34 @@ func TestFiltersModalToleratesUnknownActiveFilter(t *testing.T) {
 	m = settle(m, m.Init())
 	m, _ = send(m, key("F"))
 	fm := m.modal.(*filtersModal)
-	if fm.defs[fm.rows[0].def].Key != "subnet-id" || !strings.Contains(m.View(), "subnet-id") {
-		t.Fatal("unknown filter should stay visible")
+	if len(fm.defs) != 4 || fm.defs[3].Key != "subnet-id" || !strings.Contains(m.View(), "subnet-1") {
+		t.Fatal("unknown filter should be listed with its value")
 	}
-	m, _ = send(m, key("ctrl+n")) // must not panic
-	m, _ = send(m, key("ctrl+p"))
+	m, cmd := send(m, key("enter"))
+	settle(m, cmd)
+	if q := rec.last(); len(q.Filters) != 1 || q.Filters[0].Key != "subnet-id" {
+		t.Fatalf("drill filter lost on apply: %+v", q.Filters)
+	}
+}
+
+func TestFiltersModalScrollsWhenTallerThanScreen(t *testing.T) {
+	var defs []provider.FilterDef
+	for i := 0; i < 15; i++ {
+		defs = append(defs, provider.FilterDef{Key: "k" + string(rune('a'+i)), Name: "Filter " + string(rune('A'+i))})
+	}
+	res := fakeResource{filters: defs, pages: map[string]provider.Page{"": {}}}
+	m := newModelWith(testCfg(), res)
+	m = sized(settle(m, m.Init()), 90, 18)
+	m, _ = send(m, key("F"))
+	for i := 0; i < 14; i++ {
+		m, _ = send(m, key("down"))
+	}
+	if !strings.Contains(m.View(), "Filter O") { // the last row, focused
+		t.Fatal("focused row must stay visible")
+	}
+	if lines := strings.Split(m.View(), "\n"); len(lines) != 18 {
+		t.Fatalf("frame is %d lines", len(lines))
+	}
 }
 
 func TestModalSwallowsGlobalKeys(t *testing.T) {
@@ -417,5 +436,23 @@ func TestHelpHintSurvivesNarrowTerminals(t *testing.T) {
 	d, _ := send(m, key("d"))
 	if !strings.Contains(d.View(), "<?> Help") {
 		t.Fatal("help hint must be visible on the dashboard too")
+	}
+}
+
+func TestHeaderShowsAllShortcutsOnWideTerminals(t *testing.T) {
+	m := sized(loaded(t, filterable(&recorder{})), 220, 30)
+	v := m.View()
+	for _, want := range []string{"SSH session", "Update filters", "Open search", "Refresh data", "Reset defaults", "Next page",
+		"Sort column", "Move", "Page up / down", "Top / bottom", "Switch view", "Dashboard", "Help", "Quit"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("wide header missing %q", want)
+		}
+	}
+	// a narrow terminal drops trailing columns instead of overflowing
+	n := sized(m, 70, 30)
+	for _, l := range strings.Split(n.View(), "\n") {
+		if lipgloss.Width(l) > 70 {
+			t.Fatalf("overflow: %q", l)
+		}
 	}
 }
