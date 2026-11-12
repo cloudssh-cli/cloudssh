@@ -30,9 +30,20 @@ func defsOf(specs []filterSpec) []provider.FilterDef {
 	return out
 }
 
-// splitValues splits a filter value on commas: plain items are alternatives
-// (or), items starting with "!" are exclusions (not).
-func splitValues(v string) (include, exclude []string) {
+// parseValue reads a filter value: an optional leading "&" (every item must
+// match) or "|" (any item, the default), then comma-separated items. An item
+// starting with "!" is an exclusion.
+//
+//	web,api      web or api          &web,prod   web and prod
+//	|web,api     the same, explicit   web,!canary web, but not canary
+func parseValue(v string) (include, exclude []string, all bool) {
+	v = strings.TrimSpace(v)
+	switch {
+	case strings.HasPrefix(v, "&"):
+		all, v = true, v[1:]
+	case strings.HasPrefix(v, "|"):
+		v = v[1:]
+	}
 	for _, p := range strings.Split(v, ",") {
 		p = strings.TrimSpace(p)
 		switch {
@@ -45,7 +56,7 @@ func splitValues(v string) (include, exclude []string) {
 			include = append(include, p)
 		}
 	}
-	return include, exclude
+	return include, exclude, all
 }
 
 func (s filterSpec) wrap(v string) string {
@@ -56,13 +67,14 @@ func (s filterSpec) wrap(v string) string {
 }
 
 // buildFilters converts the positive part of UI filters to EC2 filters
-// ("a,b" becomes two alternative values). Empty values and unknown keys are
-// skipped; exclusions are applied afterwards by dropExcluded because the EC2
-// API cannot express "not".
+// ("a,b" becomes two values the API ORs, which for "&a,b" is a superset).
+// Empty values and unknown keys are skipped; "!" exclusions and "&" (and) are
+// verified afterwards by dropMismatched because the EC2 API can express
+// neither.
 func buildFilters(specs []filterSpec, fs []provider.Filter) []types.Filter {
 	var out []types.Filter
 	for _, f := range fs {
-		include, _ := splitValues(f.Value)
+		include, _, _ := parseValue(f.Value)
 		if len(include) == 0 {
 			continue
 		}
@@ -82,38 +94,56 @@ func buildFilters(specs []filterSpec, fs []provider.Filter) []types.Filter {
 	return out
 }
 
-// dropExcluded removes items matching any "!" value of the given filters.
-func dropExcluded[T any](items []T, specs []filterSpec, fs []provider.Filter, field func(T, string) ([]string, bool)) []T {
+// dropMismatched keeps the items that satisfy what the API could not check:
+// every item of an "&" list, and none of the "!" exclusions.
+func dropMismatched[T any](items []T, specs []filterSpec, fs []provider.Filter, field func(T, string) ([]string, bool)) []T {
 	type rule struct {
-		api  string
-		vals []string
+		api       string
+		must, not []string
 	}
 	var rules []rule
 	for _, f := range fs {
-		_, exclude := splitValues(f.Value)
+		include, exclude, all := parseValue(f.Value)
 		for _, s := range specs {
-			if s.key == f.Key && len(exclude) > 0 {
-				r := rule{api: s.api}
-				for _, v := range exclude {
-					r.vals = append(r.vals, s.wrap(v))
-				}
-				rules = append(rules, r)
+			if s.key != f.Key || (!all && len(exclude) == 0) {
+				continue
 			}
+			r := rule{api: s.api}
+			if all {
+				for _, v := range include {
+					r.must = append(r.must, s.wrap(v))
+				}
+			}
+			for _, v := range exclude {
+				r.not = append(r.not, s.wrap(v))
+			}
+			rules = append(rules, r)
 		}
 	}
 	if len(rules) == 0 {
 		return items
+	}
+	anyMatch := func(pattern string, have []string) bool {
+		for _, h := range have {
+			if wild(pattern, h) {
+				return true
+			}
+		}
+		return false
 	}
 	out := items[:0:0]
 next:
 	for _, it := range items {
 		for _, r := range rules {
 			have, _ := field(it, r.api)
-			for _, v := range r.vals {
-				for _, h := range have {
-					if wild(v, h) {
-						continue next
-					}
+			for _, v := range r.must {
+				if !anyMatch(v, have) {
+					continue next
+				}
+			}
+			for _, v := range r.not {
+				if anyMatch(v, have) {
+					continue next
 				}
 			}
 		}

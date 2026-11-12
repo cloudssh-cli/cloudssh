@@ -12,6 +12,10 @@ import (
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
 
+// eksPageMax keeps EKS pages small: every cluster and node group costs its own
+// describe call, so a page of 100 would mean 100 sequential requests.
+const eksPageMax = 25
+
 type eksClusters struct{ p *Provider }
 
 type eksClusterRef struct{ Name string }
@@ -31,7 +35,7 @@ func (eksClusters) Columns() []provider.Column {
 }
 
 func (r eksClusters) List(ctx context.Context, q provider.Query) (provider.Page, error) {
-	in := &eks.ListClustersInput{MaxResults: awssdk.Int32(r.p.size(100)), Include: []string{"all"}}
+	in := &eks.ListClustersInput{MaxResults: awssdk.Int32(r.p.size(eksPageMax)), Include: []string{"all"}}
 	if q.Token != "" {
 		in.NextToken = awssdk.String(q.Token)
 	}
@@ -98,7 +102,7 @@ func (eksNodeGroups) Columns() []provider.Column {
 }
 
 func (r eksNodeGroups) List(ctx context.Context, q provider.Query) (provider.Page, error) {
-	in := &eks.ListNodegroupsInput{ClusterName: &r.cluster, MaxResults: awssdk.Int32(r.p.size(100))}
+	in := &eks.ListNodegroupsInput{ClusterName: &r.cluster, MaxResults: awssdk.Int32(r.p.size(eksPageMax))}
 	if q.Token != "" {
 		in.NextToken = awssdk.String(q.Token)
 	}

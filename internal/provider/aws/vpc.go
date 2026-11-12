@@ -57,7 +57,7 @@ func (r vpcs) List(ctx context.Context, q provider.Query) (provider.Page, error)
 		return provider.Page{}, err
 	}
 	rows := make([]provider.Row, 0, len(out.Vpcs))
-	for _, v := range dropExcluded(out.Vpcs, vpcSpecs, q.Filters, vpcField) {
+	for _, v := range dropMismatched(out.Vpcs, vpcSpecs, q.Filters, vpcField) {
 		rows = append(rows, vpcRow(v))
 	}
 	return provider.Page{Rows: rows, NextToken: awssdk.ToString(out.NextToken)}, nil
@@ -130,7 +130,7 @@ func (r subnets) List(ctx context.Context, q provider.Query) (provider.Page, err
 		return provider.Page{}, err
 	}
 	rows := make([]provider.Row, 0, len(out.Subnets))
-	for _, s := range dropExcluded(out.Subnets, subnetSpecs, q.Filters, subnetField) {
+	for _, s := range dropMismatched(out.Subnets, subnetSpecs, q.Filters, subnetField) {
 		rows = append(rows, subnetRow(s))
 	}
 	return provider.Page{Rows: rows, NextToken: awssdk.ToString(out.NextToken)}, nil

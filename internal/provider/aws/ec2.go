@@ -61,7 +61,7 @@ func (r instances) List(ctx context.Context, q provider.Query) (provider.Page, e
 		all = append(all, res.Instances...)
 	}
 	var rows []provider.Row
-	for _, i := range dropExcluded(all, ec2Specs, q.Filters, instanceField) {
+	for _, i := range dropMismatched(all, ec2Specs, q.Filters, instanceField) {
 		rows = append(rows, instanceRow(i))
 	}
 	return provider.Page{Rows: rows, NextToken: awssdk.ToString(out.NextToken)}, nil
