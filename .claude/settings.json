@@ -1,6 +1,19 @@
 {
   "permissions": {
-    "allow": ["Bash(make:*)", "Bash(docker compose:*)", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)"],
-    "deny": ["Bash(git push:*)", "Read(./pems/**)", "Read(**/*.pem)"]
+    "allow": ["Bash(make:*)", "Bash(docker compose:*)", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git push:*)"],
+    "deny": [
+      "Read(./pems/**)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(~/.ssh/**)",
+      "Read(**/id_rsa*)",
+      "Read(**/id_ed25519*)",
+      "Read(**/id_ecdsa*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(~/.aws/credentials)",
+      "Read(~/.aws/sso/**)",
+      "Read(~/.aws/cli/cache/**)"
+    ]
   }
 }
