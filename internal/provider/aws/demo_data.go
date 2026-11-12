@@ -413,7 +413,14 @@ func demoProd(now time.Time) *demoAccount {
 			extra: map[string]string{"eks:cluster-name": "prod-eks", "eks:nodegroup-name": "spot"}})
 	}
 	b.instance(inst{name: "jenkins-01", typ: "t3.large", subnet: "private-a", image: al2023, key: "prod-key", age: 500 * time.Hour})
-	b.instance(inst{name: "batch-worker-1", typ: "c5.2xlarge", subnet: "private-b", image: al2023, key: "prod-key", state: ec2types.InstanceStateNamePending, age: time.Minute})
+	for n := 1; n <= 30; n++ { // a spot fleet big enough to need several pages
+		state := ec2types.InstanceStateNameRunning
+		if n == 30 {
+			state = ec2types.InstanceStateNamePending // the newest worker is still starting
+		}
+		b.instance(inst{name: fmt.Sprintf("batch-worker-%02d", n), typ: "c5.2xlarge", subnet: "private-" + azLetter(n), image: al2023, key: "prod-key",
+			asg: "batch-workers-asg", spot: true, state: state, age: time.Duration(n) * 40 * time.Minute})
+	}
 	b.instance(inst{name: "report-generator", typ: "t3.medium", subnet: "private-c", image: al2023, key: "prod-key", state: ec2types.InstanceStateNameStopping, age: 300 * time.Hour})
 	b.instance(inst{name: "old-build-agent", typ: "t3.small", subnet: "private-c", image: al2023, key: "prod-key", state: ec2types.InstanceStateNameTerminated, age: 2000 * time.Hour})
 	b.instance(inst{name: "dr-web-1", typ: "t3.medium", subnet: "dr-a", image: al2023, key: "prod-key", state: ec2types.InstanceStateNameStopped, age: 1000 * time.Hour})
@@ -421,6 +428,7 @@ func demoProd(now time.Time) *demoAccount {
 	b.instance(inst{name: "legacy-ftp", typ: "t2.micro", subnet: "default-a", image: al2023, key: "legacy-key", public: true, age: 4000 * time.Hour})
 
 	b.asg("web-prod-asg", 2, 8, 4)
+	b.asg("batch-workers-asg", 0, 40, 30)
 	b.asg("api-prod-asg", 3, 6, 3)
 	b.asg("ecs-prod-apps-asg", 3, 6, 3)
 	b.asg(general, 3, 6, 3)
@@ -495,3 +503,6 @@ func demoSandbox(now time.Time) *demoAccount {
 	b.finishSubnets()
 	return b.acc // no ASGs, ECS or EKS: the empty states
 }
+
+// azLetter spreads machines over three zones: a, b, c, a, ...
+func azLetter(n int) string { return string(rune('a' + n%3)) }

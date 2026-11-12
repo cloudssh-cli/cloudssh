@@ -7,6 +7,7 @@ package e2e
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -32,8 +33,10 @@ func keyMsg(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyUp}
 	case "down":
 		return tea.KeyMsg{Type: tea.KeyDown}
-	case "ctrl+t":
-		return tea.KeyMsg{Type: tea.KeyCtrlT}
+	case "tab":
+		return tea.KeyMsg{Type: tea.KeyTab}
+	case "right":
+		return tea.KeyMsg{Type: tea.KeyRight}
 	}
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 }
@@ -135,14 +138,29 @@ func TestDemoOpensOnRunningInstancesAndSaysItIsADemo(t *testing.T) {
 
 func TestPagingWalksEveryRunningInstance(t *testing.T) {
 	m := demo(t)
-	for i := 0; i < 6 && strings.Contains(m.View(), "Pages: "+string(rune('0'+i+1))+"+"); i++ {
+	pages := 1
+	for strings.Contains(m.View(), "Pages: "+strconv.Itoa(pages)+"+") && pages < 20 {
+		m = press(m, "n")
+		pages++
+	}
+	if pages < 5 { // ~50 running instances at 8 per page
+		t.Errorf("the demo should need several pages, got %d:\n%s", pages, m.View())
+	}
+	mustContain(t, m, "Pages: "+strconv.Itoa(pages)) // the "+" is gone: nothing left to load
+	mustNotContain(t, m, "Pages: "+strconv.Itoa(pages)+"+")
+}
+
+func TestSearchOnlySeesLoadedPagesAndSaysSo(t *testing.T) {
+	m := demo(t)
+	m = typeText(press(m, "/"), "batch-worker-2")
+	m = press(m, "enter")
+	mustContain(t, m, "Searching the 8 rows loaded so far", "n to load more")
+	mustNotContain(t, m, "batch-worker-25") // not loaded yet, so a search cannot find it
+	for i := 0; i < 6; i++ {
 		m = press(m, "n")
 	}
-	mustContain(t, m, "postgres-primary", "legacy-ftp", "jenkins-01", "web-prod-4")
-	mustNotContain(t, m, "+  ") // the page counter lost its "+": nothing left to load
-	if !strings.Contains(m.View(), "Pages: 3") {
-		t.Errorf("20 running instances at 8 per page is 3 pages:\n%s", m.View())
-	}
+	mustContain(t, m, "batch-worker-25")
+	mustNotContain(t, m, "Searching the")
 }
 
 func TestSearchNarrowsTheLoadedRows(t *testing.T) {
@@ -168,8 +186,8 @@ func TestFiltersDialogQueriesTheServer(t *testing.T) {
 func TestSSHDialogUsesTheDefaultUserFromTheImageAndOffersTheTemporaryKey(t *testing.T) {
 	m := demo(t)
 	m = press(m, "S") // first row: api-prod-1, an Ubuntu machine
-	mustContain(t, m, "SSH => api-prod-1", "ubuntu@10.0.10.", "Connect using:", "EC2 Instance Connect", "ctrl+t")
-	m = press(m, "ctrl+t")
+	mustContain(t, m, "SSH => api-prod-1", "ubuntu@10.0.10.", "Method", "EC2 Instance Connect", "tab next")
+	m = press(m, "tab", "right") // to the Method field, then change it
 	mustContain(t, m, "<temporary key>", "IdentitiesOnly=yes")
 	m = press(m, "esc")
 	mustNotContain(t, m, "SSH =>")
@@ -178,12 +196,12 @@ func TestSSHDialogUsesTheDefaultUserFromTheImageAndOffersTheTemporaryKey(t *test
 func TestAutoScalingGroupDrillsIntoItsInstances(t *testing.T) {
 	m := demo(t)
 	m = press(m, "4")
-	mustContain(t, m, "Auto Scaling Groups[5]", "web-prod-asg", "api-prod-asg", "ecs-prod-apps-asg", "Desired Capacity")
-	m = press(m, "enter") // web-prod-asg has the highest desired capacity, so it sorts first
+	mustContain(t, m, "Auto Scaling Groups[6]", "batch-workers-asg", "web-prod-asg", "api-prod-asg", "ecs-prod-apps-asg", "Desired Capacity")
+	m = press(typeText(press(m, "/"), "web-prod"), "enter", "enter")
 	mustContain(t, m, "Instances(web-prod-asg)[4]", "web-prod-1", "web-prod-4", "<autoscaling_groups>", "<ec2_instances>")
 	mustNotContain(t, m, "api-prod-1")
 	m = press(m, "esc")
-	mustContain(t, m, "Auto Scaling Groups[5]")
+	mustContain(t, m, "Auto Scaling Groups[")
 }
 
 func TestVPCToSubnetsToInstances(t *testing.T) {
