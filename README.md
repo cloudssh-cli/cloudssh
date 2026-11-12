@@ -39,8 +39,8 @@ Start on a specific screen with `--view dashboard|ec2|ecs|eks|asg|vpc`. Press `?
 | `1`–`5` | EC2 · ECS · EKS · ASG · VPC (each view keeps its own drill-down stack) |
 | `↑↓` `j k` · `pgup pgdn` · `g G` | move |
 | `enter` | drill into the row (ASG → instances, VPC → subnets → instances, ECS cluster → services → tasks → instance, EKS cluster → node groups → instances); on instances, SSH |
-| `esc` `[` · `]` | clear search, then go back one level (`[` goes back, `]` forward again) |
-| `{` `}` | previous / next view, wrapping around the dashboard |
+| `esc` `[` · `]` | clear search, then go back one level inside the view (`[` goes back, `]` forward again) |
+| `{` `}` | back / forward through the views you visited (dashboard, EC2, ECS, …), like a browser |
 | `S` | SSH dialog: user, private/public IP, command preview, and a *Method* choice (`tab` to the row, `←/→` to change) to connect with [EC2 Instance Connect](#ec2-instance-connect) instead of your own key |
 | `/` `f` `s` | search loaded rows. One syntax for search and filters: a space or `&` is AND, `\|` or `,` is OR, `!a` is NOT, `( )` groups. A space separates whole conditions, each evaluated on its own and ANDed: `web\|api !canary` = (web or api) and not canary; inside one condition `&` binds tighter than `\|` (`↑↓` in the box recall previous searches). The first page shows at once, the next few load in the background, and opening search loads more; the title shows `[25+]` while pages remain |
 | `F` | server-side filters: every filter (name, state, type, AZ, IPs, ASG, …) is listed, fill in the ones you want; the same syntax as search (below); `R` resets them all |
@@ -51,7 +51,57 @@ Start on a specific screen with `--view dashboard|ec2|ecs|eks|asg|vpc`. Press `?
 | `?` | help |
 | `q` | quit |
 
-Config (`$XDG_CONFIG_HOME/cloudssh/config.yaml`, or `--config`):
+## Searching and filtering
+
+The search box (`/`) and the filter dialog (`F`) understand the same small language. Search matches the rows already loaded; filters are sent to AWS where possible and always re-checked on what comes back, so every form below is exact.
+
+| Write | Meaning |
+|---|---|
+| `web` | contains `web` (case-insensitive for search; filters follow what the field supports) |
+| `web&api` | `web` **and** `api` |
+| `web\|api` or `web,api` | `web` **or** `api` |
+| `!canary` | **not** `canary` |
+| `web&(api\|db)` | `web` and either `api` or `db` |
+| `web api` | a space separates **whole conditions**, each evaluated on its own, then ANDed |
+| `web\|api !canary` | (`web` or `api`) and not `canary` |
+| `web&api\|db` | (`web` and `api`) or `db`: inside one condition `&` binds tighter than `\|` |
+| `web \| api` | spaces next to `&`, `\|`, `!` or a bracket are ignored |
+
+Think of every space as an invisible pair of parentheses. `!` applies to the one term or group right after it: `!(a\|b)` means neither.
+
+**Escaping.** A backslash makes the next character plain text: `\|`, `\&`, `\(`, `\)`, `\,`, `\!` and `\ ` (an escaped space) are searched for literally, and `\\` is one backslash. For example `a\ b` finds the text `a b`, `\!x` finds `!x`, `a\|b` finds `a|b`. A `!` in the middle of a word (`a!b`) is already plain.
+
+**Typing is forgiving.** A missing `)` is closed at the end and stray operators are ignored, so a half-typed query never errors. A query with nothing usable matches everything. In the filter dialog each field has its own query, and the fields are ANDed together; `R` clears them all.
+
+**Paging.** Search covers the pages loaded so far (the footer says when more exist, and opening search loads more). Filters narrow the list on the server first, so they reach beyond what is loaded.
+
+## Themes
+
+`theme: auto` (the default) follows your terminal: light background gets `light`, dark or unknown gets `dark`. Pick one with `theme:` in the config or `--theme dark|light|<yours>`.
+
+Your own themes are YAML files in `~/.config/cloudssh/themes/` (`$XDG_CONFIG_HOME/cloudssh/themes/` when set). The file name is the theme name: `nord.yaml` is used with `--theme nord`. Anything you leave out comes from `base` (`dark` by default, or `light`); naming a file `dark.yaml` or `light.yaml` replaces that built-in.
+
+```yaml
+# ~/.config/cloudssh/themes/nord.yaml
+base: dark
+colors:
+  border: "#88C0D0"     # panel borders and cell text
+  title: "#B48EAD"      # titles, header keys, sort marker
+  highlight: "#81A1C1"  # selected row, status line, search chip
+  strong: "#ECEFF4"     # column headings
+  muted: "#7B88A1"      # secondary text
+  ok: "#A3BE8C"         # running / available
+  warn: "#EBCB8B"       # pending / warnings
+  err: "#BF616A"        # stopped / errors
+  on_fill: "#2E3440"    # text on filled backgrounds (selection, breadcrumbs)
+  help_key: "#EBCB8B"   # key names on the help page
+  help_head: "#88C0D0"  # help section headings
+  fade: "#2E3440"       # the splash logo fades into this: your terminal background
+```
+
+Colours are `#rrggbb`. A file with a mistake is skipped, and choosing it tells you what is wrong.
+
+Config (`~/.config/cloudssh/config.yaml`, `$XDG_CONFIG_HOME/cloudssh/config.yaml` when set, or `--config`):
 
 ```yaml
 cloud: aws

@@ -59,13 +59,35 @@ func Default() Config {
 	}
 }
 
-// DefaultPath is where the config file is looked up when --config is not set.
-func DefaultPath() (string, error) {
-	dir, err := os.UserConfigDir()
+// Dir is cloudssh's configuration directory: $XDG_CONFIG_HOME/cloudssh, else
+// ~/.config/cloudssh (on every OS, macOS included, like k9s).
+func Dir() (string, error) {
+	if x := os.Getenv("XDG_CONFIG_HOME"); x != "" {
+		return filepath.Join(x, "cloudssh"), nil
+	}
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "cloudssh", "config.yaml"), nil
+	return filepath.Join(home, ".config", "cloudssh"), nil
+}
+
+// DefaultPath is where the config file is looked up when --config is not set.
+func DefaultPath() (string, error) {
+	dir, err := Dir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "config.yaml"), nil
+}
+
+// ThemesDir holds user colour themes (*.yaml).
+func ThemesDir() (string, error) {
+	dir, err := Dir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "themes"), nil
 }
 
 // Load reads path over the defaults. A missing file is not an error unless

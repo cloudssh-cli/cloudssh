@@ -73,6 +73,9 @@ func NewRootCmd() *cobra.Command {
 			if theme != "" {
 				cfg.Theme = theme
 			}
+			if dir, err := config.ThemesDir(); err == nil {
+				ui.LoadThemes(dir)
+			}
 			if err := ui.SetTheme(cfg.Theme); err != nil {
 				return err
 			}
@@ -99,7 +102,7 @@ func NewRootCmd() *cobra.Command {
 	f.StringVar(&ssh, "ssh-method", "", fmt.Sprintf("default connection method: %q (your keys) or %q (a short-lived key pushed through the cloud, when offered)", config.SSHMethodSSH, config.SSHMethodTemporaryKey))
 	f.StringVar(&pems, "pem-files-path", "", "directory holding <key-pair-name>.pem files")
 	f.IntVar(&pageSize, "page-size", 0, "items per page (minimum 5)")
-	f.StringVar(&theme, "theme", "", "colour theme: "+strings.Join(ui.ThemeNames(), ", ")+" (default auto: follows the terminal background, dark if unknown)")
+	f.StringVar(&theme, "theme", "", "colour theme: "+strings.Join(ui.ThemeNames(), ", ")+" (default auto: follows the terminal background, dark if unknown); your own: <config dir>/themes/<name>.yaml")
 	f.StringVar(&view, "view", "", "screen to open first: dashboard or a resource key of the chosen cloud (default: its first resource)")
 	cmd.SetVersionTemplate(fmt.Sprintf("cloudssh %s (commit %s, built %s)\n", version.Version, version.Commit, version.Date))
 	return cmd

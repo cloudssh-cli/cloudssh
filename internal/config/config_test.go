@@ -74,3 +74,21 @@ func TestSSHMethodDefaultAndValidation(t *testing.T) {
 		t.Fatal("unknown ssh_method must be rejected")
 	}
 }
+
+func TestConfigDirIsXDGOrDotConfigOnEveryOS(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "/x/cfg")
+	if d, _ := Dir(); d != "/x/cfg/cloudssh" {
+		t.Fatalf("XDG: %s", d)
+	}
+	if p, _ := ThemesDir(); p != "/x/cfg/cloudssh/themes" {
+		t.Fatalf("themes: %s", p)
+	}
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("HOME", "/home/u")
+	if d, _ := Dir(); d != "/home/u/.config/cloudssh" {
+		t.Fatalf("default: %s", d)
+	}
+	if p, _ := DefaultPath(); p != "/home/u/.config/cloudssh/config.yaml" {
+		t.Fatalf("config path: %s", p)
+	}
+}

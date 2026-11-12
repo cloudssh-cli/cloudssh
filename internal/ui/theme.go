@@ -2,10 +2,14 @@ package ui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"gopkg.in/yaml.v3"
 )
 
 // Theme is a complete colour scheme. Every colour in the UI comes from one of
@@ -67,7 +71,11 @@ func ResolveTheme(choice string, systemDark func() bool) (string, error) {
 		return ThemeDefault, nil
 	}
 	if _, ok := themes[choice]; !ok {
-		return "", fmt.Errorf("unknown theme %q (choose one of: %s)", choice, strings.Join(ThemeNames(), ", "))
+		err := fmt.Errorf("unknown theme %q (choose one of: %s)", choice, strings.Join(ThemeNames(), ", "))
+		if bad, ok := themeProblems[choice]; ok {
+			err = fmt.Errorf("theme %q could not be loaded: %w", choice, bad)
+		}
+		return "", err
 	}
 	return choice, nil
 }
@@ -88,3 +96,100 @@ func SetTheme(choice string) error {
 }
 
 func init() { applyTheme(themes[ThemeDefault]) }
+
+// ---- themes from files ----
+
+// themeProblems remembers files that failed to load, by theme name, so choosing
+// one reports why instead of just "unknown".
+var themeProblems = map[string]error{}
+
+var (
+	hexColour = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+	themeName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+)
+
+// themeFile is the YAML a user writes in <config dir>/themes/<name>.yaml:
+//
+//	base: dark            # optional, dark (default) or light: unlisted colours come from it
+//	colors:
+//	  border: "#6FD0FF"   # any of the roles below; #rrggbb only
+//	  title: "#FF00FF"
+type themeFile struct {
+	Base   string            `yaml:"base"`
+	Colors map[string]string `yaml:"colors"`
+}
+
+// roles maps a colour name in a theme file to its field.
+func (t *Theme) roles() map[string]*string {
+	return map[string]*string{
+		"border": &t.Border, "title": &t.Title, "highlight": &t.Highlight, "strong": &t.Strong,
+		"muted": &t.Muted, "ok": &t.OK, "warn": &t.Warn, "err": &t.Err, "on_fill": &t.OnFill,
+		"help_key": &t.HelpKey, "help_head": &t.HelpHead, "fade": &t.Fade,
+	}
+}
+
+// ParseTheme reads one theme file's content. Colours it does not set come from
+// its base theme.
+func ParseTheme(data []byte) (Theme, error) {
+	var f themeFile
+	if err := yaml.Unmarshal(data, &f); err != nil {
+		return Theme{}, err
+	}
+	base := strings.ToLower(strings.TrimSpace(f.Base))
+	if base == "" {
+		base = ThemeDefault
+	}
+	t, ok := themes[base]
+	if !ok {
+		return Theme{}, fmt.Errorf("base %q is not a theme (use dark or light)", f.Base)
+	}
+	roles := t.roles()
+	for name, val := range f.Colors {
+		dst, ok := roles[strings.ToLower(name)]
+		if !ok {
+			known := make([]string, 0, len(roles))
+			for k := range roles {
+				known = append(known, k)
+			}
+			sort.Strings(known)
+			return Theme{}, fmt.Errorf("unknown colour %q (known: %s)", name, strings.Join(known, ", "))
+		}
+		if !hexColour.MatchString(val) {
+			return Theme{}, fmt.Errorf("colour %s: %q is not a #rrggbb value", name, val)
+		}
+		*dst = val
+	}
+	return t, nil
+}
+
+// LoadThemes registers every *.yaml / *.yml in dir as a theme named after the
+// file (dark.yaml replaces the built-in dark). A missing dir is fine. Files
+// that fail to load are skipped, and why is reported if that theme is chosen.
+// It returns the names it added.
+func LoadThemes(dir string) []string {
+	files, _ := filepath.Glob(filepath.Join(dir, "*.y*ml"))
+	sort.Strings(files)
+	var added []string
+	for _, path := range files {
+		ext := filepath.Ext(path)
+		if ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+		name := strings.ToLower(strings.TrimSuffix(filepath.Base(path), ext))
+		if !themeName.MatchString(name) || name == ThemeAuto {
+			continue
+		}
+		data, err := os.ReadFile(path) //nolint:gosec // the user's own theme directory
+		if err == nil {
+			var t Theme
+			if t, err = ParseTheme(data); err == nil {
+				themes[name] = t
+				delete(themeProblems, name)
+				added = append(added, name)
+				continue
+			}
+		}
+		themeProblems[name] = fmt.Errorf("%s: %w", path, err)
+	}
+	return added
+}
