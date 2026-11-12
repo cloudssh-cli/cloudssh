@@ -53,3 +53,24 @@ func TestViewAndSplashDefaultsAndOverride(t *testing.T) {
 		t.Fatalf("overrides: %+v", cfg)
 	}
 }
+
+func TestSSHMethodDefaultAndValidation(t *testing.T) {
+	if Default().SSHMethod != "ssh" {
+		t.Fatalf("default: %q", Default().SSHMethod)
+	}
+	dir := t.TempDir()
+	good := filepath.Join(dir, "good.yaml")
+	if err := os.WriteFile(good, []byte("ssh_method: instance-connect\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, err := Load(good, true); err != nil || cfg.SSHMethod != "instance-connect" {
+		t.Fatalf("good: %+v %v", cfg, err)
+	}
+	bad := filepath.Join(dir, "bad.yaml")
+	if err := os.WriteFile(bad, []byte("ssh_method: telnet\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(bad, true); err == nil {
+		t.Fatal("unknown ssh_method must be rejected")
+	}
+}

@@ -20,6 +20,9 @@ type Config struct {
 	// View is the screen opened at start: "dashboard" or a resource key (ec2, ecs, eks, asg, vpc).
 	View       string `yaml:"view"`
 	SkipSplash bool   `yaml:"skip_splash"`
+	// SSHMethod is the default connection method: "ssh" (your keys) or
+	// "instance-connect" (temporary key pushed through the cloud, e.g. EC2 Instance Connect).
+	SSHMethod string `yaml:"ssh_method"`
 }
 
 // Default returns the built-in configuration.
@@ -30,6 +33,7 @@ func Default() Config {
 		DefaultIP:    "private",
 		PageSize:     50,
 		View:         "ec2",
+		SSHMethod:    "ssh",
 	}
 }
 
@@ -55,6 +59,9 @@ func Load(path string, explicit bool) (Config, error) {
 	}
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
+	}
+	if cfg.SSHMethod != "ssh" && cfg.SSHMethod != "instance-connect" {
+		return cfg, fmt.Errorf("ssh_method %q must be \"ssh\" or \"instance-connect\"", cfg.SSHMethod)
 	}
 	if cfg.PageSize < 5 {
 		cfg.PageSize = 5

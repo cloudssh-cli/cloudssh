@@ -18,9 +18,9 @@ import (
 
 func NewRootCmd() *cobra.Command {
 	var (
-		cfgPath                            string
-		cloud, profile, region, view, pems string
-		pageSize                           int
+		cfgPath                                       string
+		cloud, profile, region, view, pems, sshMethod string
+		pageSize                                      int
 	)
 	cmd := &cobra.Command{
 		Use:           "cloudssh",
@@ -53,6 +53,12 @@ func NewRootCmd() *cobra.Command {
 			if view != "" {
 				cfg.View = view
 			}
+			if sshMethod != "" {
+				if sshMethod != "ssh" && sshMethod != "instance-connect" {
+					return fmt.Errorf("--ssh-method must be \"ssh\" or \"instance-connect\", got %q", sshMethod)
+				}
+				cfg.SSHMethod = sshMethod
+			}
 			if pems != "" {
 				cfg.PemFilesPath = pems
 			}
@@ -81,6 +87,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.Flags().StringVar(&cloud, "cloud", "", "cloud provider (aws)")
 	cmd.Flags().StringVar(&profile, "profile", "", "AWS profile")
 	cmd.Flags().StringVar(&region, "region", "", "AWS region")
+	cmd.Flags().StringVar(&sshMethod, "ssh-method", "", "default connection method: ssh or instance-connect (EC2 Instance Connect)")
 	cmd.Flags().StringVar(&pems, "pem-files-path", "", "directory holding <key-pair-name>.pem files")
 	cmd.Flags().IntVar(&pageSize, "page-size", 0, "items per page (minimum 5)")
 	cmd.Flags().StringVar(&view, "view", "", "screen to open first: dashboard, ec2, ecs, eks, asg, vpc (default ec2)")
