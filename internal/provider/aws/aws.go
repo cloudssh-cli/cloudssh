@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -16,6 +17,10 @@ import (
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
+
+// credentialsTimeout bounds the up-front credential check (the default chain
+// may try the EC2 metadata service, which is slow to give up off AWS).
+const credentialsTimeout = 10 * time.Second
 
 type Provider struct {
 	ec2      *ec2.Client
@@ -37,7 +42,13 @@ func New(ctx context.Context, profile, region string, pageSize int32) (*Provider
 	}
 	cfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("load aws config: %w", err)
+		return nil, explainAuthError(err, profile)
+	}
+	// Fail now, with advice, instead of opening a UI whose first load errors.
+	cctx, cancel := context.WithTimeout(ctx, credentialsTimeout)
+	defer cancel()
+	if _, err := cfg.Credentials.Retrieve(cctx); err != nil {
+		return nil, explainAuthError(err, profile)
 	}
 	return &Provider{
 		ec2:      ec2.NewFromConfig(cfg),

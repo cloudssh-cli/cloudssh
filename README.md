@@ -19,6 +19,8 @@ make run     # run the TUI in a container
 cloudssh --profile prod --region us-east-1
 ```
 
+cloudssh uses the standard AWS credential chain (`--profile`, `AWS_PROFILE`, SSO, environment keys, instance role). It checks the credentials before the UI starts: a missing profile, no credentials, or an expired SSO session exits with a message that says how to fix it.
+
 Start on a specific screen with `--view dashboard|ec2|ecs|eks|asg|vpc`. Press `?` in the app for the full list of keys, including the sort key of every column on the current screen.
 
 | Key | Action |
