@@ -10,6 +10,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2instanceconnect"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 
@@ -21,6 +22,7 @@ type Provider struct {
 	asg      *autoscaling.Client
 	ecs      *ecs.Client
 	eks      *eks.Client
+	eic      instanceConnect
 	pageSize int32
 }
 
@@ -42,6 +44,7 @@ func New(ctx context.Context, profile, region string, pageSize int32) (*Provider
 		asg:      autoscaling.NewFromConfig(cfg),
 		ecs:      ecs.NewFromConfig(cfg),
 		eks:      eks.NewFromConfig(cfg),
+		eic:      ec2instanceconnect.NewFromConfig(cfg),
 		pageSize: pageSize,
 	}, nil
 }

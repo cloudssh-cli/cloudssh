@@ -92,6 +92,7 @@ type Host struct {
 	PublicIP  string
 	KeyName   string
 	ImageID   string
+	AZ        string // needed by short-lived key services such as EC2 Instance Connect
 	// DefaultUser is a best-effort guess derived from the image, may be empty.
 	DefaultUser string
 }
@@ -100,4 +101,13 @@ type Host struct {
 // before connecting (e.g. look up the default SSH user from the AMI).
 type HostResolver interface {
 	ResolveHost(ctx context.Context, h Host) (Host, error)
+}
+
+// Authorizer is optionally implemented by a Provider that can grant
+// short-lived SSH access without a pre-shared key (AWS EC2 Instance Connect):
+// it installs publicKey for user on the host for a short time.
+type Authorizer interface {
+	// AuthLabel names the mechanism in the UI, e.g. "EC2 Instance Connect".
+	AuthLabel() string
+	AuthorizeSSH(ctx context.Context, h Host, user, publicKey string) error
 }

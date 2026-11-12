@@ -44,3 +44,7 @@ func TestInstanceRowToleratesMissingOptionalFields(t *testing.T) {
 		t.Fatalf("cells/columns mismatch: %d", len(row.Cells))
 	}
 }
+
+func testInstanceInAZ(az string) types.Instance {
+	return types.Instance{InstanceId: awssdk.String("i-9"), Placement: &types.Placement{AvailabilityZone: awssdk.String(az)}}
+}

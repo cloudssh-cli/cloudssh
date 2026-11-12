@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.33.10
 	github.com/aws/aws-sdk-go-v2/service/autoscaling v1.81.0
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.341.0
+	github.com/aws/aws-sdk-go-v2/service/ec2instanceconnect v1.44.7
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.105.1
 	github.com/aws/aws-sdk-go-v2/service/eks v1.105.6
 	github.com/aws/smithy-go v1.28.9

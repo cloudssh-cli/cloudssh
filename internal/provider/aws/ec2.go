@@ -84,7 +84,7 @@ func instanceRow(i types.Instance) provider.Row {
 		Cells: []string{id, name, string(i.InstanceType), az, priv, pub, asg, state},
 		Ref: provider.Host{
 			ID: id, Name: name, PrivateIP: priv, PublicIP: pub,
-			KeyName: awssdk.ToString(i.KeyName), ImageID: awssdk.ToString(i.ImageId),
+			KeyName: awssdk.ToString(i.KeyName), ImageID: awssdk.ToString(i.ImageId), AZ: az,
 		},
 	}
 }
