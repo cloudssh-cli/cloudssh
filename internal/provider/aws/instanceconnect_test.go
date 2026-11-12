@@ -25,7 +25,7 @@ func (f *fakeEIC) SendSSHPublicKey(_ context.Context, in *ec2instanceconnect.Sen
 
 func TestAuthorizeSSHSendsKeyForInstanceAndUser(t *testing.T) {
 	f := &fakeEIC{out: &ec2instanceconnect.SendSSHPublicKeyOutput{Success: true}}
-	p := &Provider{eic: f}
+	p := withEIC(f)
 	h := provider.Host{ID: "i-1", AZ: "us-east-1a"}
 	if err := p.AuthorizeSSH(context.Background(), h, "ubuntu", "ssh-ed25519 AAAA"); err != nil {
 		t.Fatal(err)
@@ -38,14 +38,14 @@ func TestAuthorizeSSHSendsKeyForInstanceAndUser(t *testing.T) {
 
 func TestAuthorizeSSHErrors(t *testing.T) {
 	ctx := context.Background()
-	if err := (&Provider{eic: &fakeEIC{}}).AuthorizeSSH(ctx, provider.Host{ID: "i-1"}, "u", "k"); err == nil || !strings.Contains(err.Error(), "availability zone") {
+	if err := withEIC(&fakeEIC{}).AuthorizeSSH(ctx, provider.Host{ID: "i-1"}, "u", "k"); err == nil || !strings.Contains(err.Error(), "availability zone") {
 		t.Fatalf("missing AZ should fail clearly, got %v", err)
 	}
-	p := &Provider{eic: &fakeEIC{err: errors.New("AccessDenied")}}
+	p := withEIC(&fakeEIC{err: errors.New("AccessDenied")})
 	if err := p.AuthorizeSSH(ctx, provider.Host{ID: "i-1", AZ: "a"}, "u", "k"); err == nil || !strings.Contains(err.Error(), "AccessDenied") {
 		t.Fatalf("API error should surface, got %v", err)
 	}
-	p = &Provider{eic: &fakeEIC{out: &ec2instanceconnect.SendSSHPublicKeyOutput{Success: false}}}
+	p = withEIC(&fakeEIC{out: &ec2instanceconnect.SendSSHPublicKeyOutput{Success: false}})
 	if err := p.AuthorizeSSH(ctx, provider.Host{ID: "i-1", AZ: "a"}, "u", "k"); err == nil {
 		t.Fatal("Success=false must be an error")
 	}
@@ -58,3 +58,6 @@ func TestInstanceRowCarriesAZForInstanceConnect(t *testing.T) {
 		t.Fatalf("host: %+v", h)
 	}
 }
+
+// withEIC is a connected provider whose only client is the given fake.
+func withEIC(c instanceConnect) *Provider { return &Provider{cl: &clients{eic: c}} }

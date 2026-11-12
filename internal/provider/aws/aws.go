@@ -4,7 +4,9 @@ package aws
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
+	"sync"
 	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -18,46 +20,131 @@ import (
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
 
-// credentialsTimeout bounds the up-front credential check (the default chain
-// may try the EC2 metadata service, which is slow to give up off AWS).
+// credentialsTimeout bounds the credential check (the default chain may try
+// the EC2 metadata service, which is slow to give up off AWS).
 const credentialsTimeout = 10 * time.Second
 
-type Provider struct {
-	ec2      *ec2.Client
-	asg      *autoscaling.Client
-	ecs      *ecs.Client
-	eks      *eks.Client
-	eic      instanceConnect
-	pageSize int32
+// clients are the service clients for one profile. They are replaced as a
+// whole when the user switches profile.
+type clients struct {
+	ec2 *ec2.Client
+	asg *autoscaling.Client
+	ecs *ecs.Client
+	eks *eks.Client
+	eic instanceConnect
 }
 
-// New loads credentials via the standard AWS chain (env, ~/.aws, SSO, IMDS).
+type Provider struct {
+	pageSize     int32
+	regionFlag   string // --region / config, wins over the profile's region
+	profileInUse string
+
+	mu      sync.RWMutex
+	cl      *clients
+	authErr error
+	region  string
+	access  string // header text, e.g. "profile prod · SSO"
+}
+
+var (
+	_ provider.Authenticator = (*Provider)(nil)
+	_ provider.HostResolver  = (*Provider)(nil)
+)
+
+// New returns a provider even when it cannot sign in: the UI starts, says what
+// is missing and lets the user pick a profile or retry (see AuthError).
 func New(ctx context.Context, profile, region string, pageSize int32) (*Provider, error) {
+	p := &Provider{pageSize: pageSize, regionFlag: region}
+	_ = p.UseProfile(ctx, profile) // the outcome is kept in AuthError
+	return p, nil
+}
+
+// buildClients loads the profile, verifies its credentials and region, and
+// creates the service clients.
+func buildClients(ctx context.Context, profile, regionFlag string) (*clients, string, string, error) {
 	var opts []func(*awsconfig.LoadOptions) error
 	if profile != "" {
 		opts = append(opts, awsconfig.WithSharedConfigProfile(profile))
 	}
-	if region != "" {
-		opts = append(opts, awsconfig.WithRegion(region))
+	if regionFlag != "" {
+		opts = append(opts, awsconfig.WithRegion(regionFlag))
 	}
 	cfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
-		return nil, explainAuthError(err, profile)
+		return nil, "", "", explainAuthError(err, profile)
 	}
-	// Fail now, with advice, instead of opening a UI whose first load errors.
 	cctx, cancel := context.WithTimeout(ctx, credentialsTimeout)
 	defer cancel()
-	if _, err := cfg.Credentials.Retrieve(cctx); err != nil {
-		return nil, explainAuthError(err, profile)
+	creds, err := cfg.Credentials.Retrieve(cctx)
+	if err != nil {
+		return nil, "", "", explainAuthError(err, profile)
 	}
-	return &Provider{
-		ec2:      ec2.NewFromConfig(cfg),
-		asg:      autoscaling.NewFromConfig(cfg),
-		ecs:      ecs.NewFromConfig(cfg),
-		eks:      eks.NewFromConfig(cfg),
-		eic:      ec2instanceconnect.NewFromConfig(cfg),
-		pageSize: pageSize,
-	}, nil
+	if cfg.Region == "" {
+		return nil, "", "", noRegionError(profile)
+	}
+	return &clients{
+		ec2: ec2.NewFromConfig(cfg),
+		asg: autoscaling.NewFromConfig(cfg),
+		ecs: ecs.NewFromConfig(cfg),
+		eks: eks.NewFromConfig(cfg),
+		eic: ec2instanceconnect.NewFromConfig(cfg),
+	}, cfg.Region, describeAccess(profile, creds.Source), nil
+}
+
+// UseProfile (re)connects with profile and records the outcome.
+func (p *Provider) UseProfile(ctx context.Context, profile string) error {
+	cl, region, access, err := buildClients(ctx, profile, p.regionFlag)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.profileInUse = profile
+	if err != nil {
+		p.cl, p.authErr, p.region, p.access = nil, err, "", "not signed in"
+		return err
+	}
+	p.cl, p.authErr, p.region, p.access = cl, nil, region, access
+	return nil
+}
+
+func (p *Provider) AuthError() error {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.authErr
+}
+
+// Profile is the explicit profile, else AWS_PROFILE, else "" (env keys, instance role).
+func (p *Provider) Profile() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.profileInUse != "" {
+		return p.profileInUse
+	}
+	return os.Getenv("AWS_PROFILE")
+}
+
+// Access says how we are signed in ("profile prod · SSO", "environment keys", ...).
+func (p *Provider) Access() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.access
+}
+
+func (p *Provider) Region() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.region
+}
+
+// clients returns the live clients, or the friendly reason there are none.
+func (p *Provider) clients() (*clients, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.authErr != nil {
+		return nil, p.authErr
+	}
+	if p.cl == nil {
+		return nil, errNotConnected
+	}
+	return p.cl, nil
 }
 
 func (p *Provider) Name() string { return "aws" }
@@ -81,7 +168,11 @@ func (p *Provider) ResolveHost(ctx context.Context, h provider.Host) (provider.H
 	if h.ImageID == "" || h.DefaultUser != "" {
 		return h, nil
 	}
-	out, err := p.ec2.DescribeImages(ctx, &ec2.DescribeImagesInput{
+	cl, err := p.clients()
+	if err != nil {
+		return h, err
+	}
+	out, err := cl.ec2.DescribeImages(ctx, &ec2.DescribeImagesInput{
 		ImageIds:          []string{h.ImageID},
 		IncludeDeprecated: awssdk.Bool(true),
 		IncludeDisabled:   awssdk.Bool(true),

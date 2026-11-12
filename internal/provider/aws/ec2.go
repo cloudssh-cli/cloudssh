@@ -48,7 +48,11 @@ func (r instances) List(ctx context.Context, q provider.Query) (provider.Page, e
 	if q.Token != "" {
 		in.NextToken = awssdk.String(q.Token)
 	}
-	out, err := r.p.ec2.DescribeInstances(ctx, in)
+	cl, err := r.p.clients()
+	if err != nil {
+		return provider.Page{}, err
+	}
+	out, err := cl.ec2.DescribeInstances(ctx, in)
 	if err != nil {
 		return provider.Page{}, err
 	}

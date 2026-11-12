@@ -37,7 +37,11 @@ func (r asgs) List(ctx context.Context, q provider.Query) (provider.Page, error)
 	if q.Token != "" {
 		in.NextToken = awssdk.String(q.Token)
 	}
-	out, err := r.p.asg.DescribeAutoScalingGroups(ctx, in)
+	cl, err := r.p.clients()
+	if err != nil {
+		return provider.Page{}, err
+	}
+	out, err := cl.asg.DescribeAutoScalingGroups(ctx, in)
 	if err != nil {
 		return provider.Page{}, err
 	}

@@ -24,6 +24,9 @@ func TestIntegrationListResources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if ae := p.AuthError(); ae != nil { // New starts even when signed out
+		t.Fatalf("not signed in: %v", ae)
+	}
 	for _, res := range p.Resources() {
 		t.Run(res.Key(), func(t *testing.T) {
 			page, err := res.List(ctx, provider.Query{Filters: res.DefaultFilters()})

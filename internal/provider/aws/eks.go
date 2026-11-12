@@ -35,13 +35,17 @@ func (r eksClusters) List(ctx context.Context, q provider.Query) (provider.Page,
 	if q.Token != "" {
 		in.NextToken = awssdk.String(q.Token)
 	}
-	list, err := r.p.eks.ListClusters(ctx, in)
+	cl, err := r.p.clients()
+	if err != nil {
+		return provider.Page{}, err
+	}
+	list, err := cl.eks.ListClusters(ctx, in)
 	if err != nil {
 		return provider.Page{}, err
 	}
 	rows := make([]provider.Row, 0, len(list.Clusters))
 	for _, name := range list.Clusters {
-		d, err := r.p.eks.DescribeCluster(ctx, &eks.DescribeClusterInput{Name: awssdk.String(name)})
+		d, err := cl.eks.DescribeCluster(ctx, &eks.DescribeClusterInput{Name: awssdk.String(name)})
 		if err != nil {
 			return provider.Page{}, err
 		}
@@ -98,13 +102,17 @@ func (r eksNodeGroups) List(ctx context.Context, q provider.Query) (provider.Pag
 	if q.Token != "" {
 		in.NextToken = awssdk.String(q.Token)
 	}
-	list, err := r.p.eks.ListNodegroups(ctx, in)
+	cl, err := r.p.clients()
+	if err != nil {
+		return provider.Page{}, err
+	}
+	list, err := cl.eks.ListNodegroups(ctx, in)
 	if err != nil {
 		return provider.Page{}, err
 	}
 	rows := make([]provider.Row, 0, len(list.Nodegroups))
 	for _, name := range list.Nodegroups {
-		d, err := r.p.eks.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{ClusterName: &r.cluster, NodegroupName: awssdk.String(name)})
+		d, err := cl.eks.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{ClusterName: &r.cluster, NodegroupName: awssdk.String(name)})
 		if err != nil {
 			return provider.Page{}, err
 		}

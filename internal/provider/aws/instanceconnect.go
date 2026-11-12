@@ -27,7 +27,11 @@ func (p *Provider) AuthorizeSSH(ctx context.Context, h provider.Host, user, publ
 	if h.ID == "" || h.AZ == "" {
 		return errors.New("instance id / availability zone unknown")
 	}
-	out, err := p.eic.SendSSHPublicKey(ctx, &ec2instanceconnect.SendSSHPublicKeyInput{
+	cl, err := p.clients()
+	if err != nil {
+		return err
+	}
+	out, err := cl.eic.SendSSHPublicKey(ctx, &ec2instanceconnect.SendSSHPublicKeyInput{
 		InstanceId:       awssdk.String(h.ID),
 		InstanceOSUser:   awssdk.String(user),
 		SSHPublicKey:     awssdk.String(publicKey),

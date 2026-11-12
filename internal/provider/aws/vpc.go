@@ -48,7 +48,11 @@ func (r vpcs) List(ctx context.Context, q provider.Query) (provider.Page, error)
 	if q.Token != "" {
 		in.NextToken = awssdk.String(q.Token)
 	}
-	out, err := r.p.ec2.DescribeVpcs(ctx, in)
+	cl, err := r.p.clients()
+	if err != nil {
+		return provider.Page{}, err
+	}
+	out, err := cl.ec2.DescribeVpcs(ctx, in)
 	if err != nil {
 		return provider.Page{}, err
 	}
@@ -117,7 +121,11 @@ func (r subnets) List(ctx context.Context, q provider.Query) (provider.Page, err
 	if q.Token != "" {
 		in.NextToken = awssdk.String(q.Token)
 	}
-	out, err := r.p.ec2.DescribeSubnets(ctx, in)
+	cl, err := r.p.clients()
+	if err != nil {
+		return provider.Page{}, err
+	}
+	out, err := cl.ec2.DescribeSubnets(ctx, in)
 	if err != nil {
 		return provider.Page{}, err
 	}

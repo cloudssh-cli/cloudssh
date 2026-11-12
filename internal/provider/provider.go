@@ -111,3 +111,33 @@ type Authorizer interface {
 	AuthLabel() string
 	AuthorizeSSH(ctx context.Context, h Host, user, publicKey string) error
 }
+
+// ProfileInfo describes one locally configured profile.
+type ProfileInfo struct {
+	Name   string
+	Kind   string // how it signs in: "SSO", "access keys", "assumed role", ...
+	Region string
+	Detail string // e.g. the SSO account/role or the role ARN
+}
+
+// Authenticator is optionally implemented by a Provider whose credentials or
+// profile can be chosen at runtime. The provider starts even when it cannot
+// sign in; the UI then explains the problem and offers the way forward.
+type Authenticator interface {
+	// AuthError is nil when ready. Otherwise it is a friendly explanation:
+	// the first line is a headline, the rest is guidance.
+	AuthError() error
+	// Access says how the app is signed in, for the header: "profile prod · SSO",
+	// "environment keys", "instance role", ...
+	Access() string
+	// Region is the region in use, if known.
+	Region() string
+	// Profile is the profile in use ("" when none, e.g. environment keys).
+	Profile() string
+	// Profiles lists the profiles configured on this machine (may be empty).
+	Profiles() []ProfileInfo
+	// UseProfile (re)connects with profile ("" = default credential chain) and
+	// returns the same friendly error AuthError would. Calling it with the
+	// current profile retries, e.g. after the user logged in elsewhere.
+	UseProfile(ctx context.Context, profile string) error
+}

@@ -77,13 +77,17 @@ func (r ecsClusters) List(ctx context.Context, q provider.Query) (provider.Page,
 	if q.Token != "" {
 		in.NextToken = awssdk.String(q.Token)
 	}
-	list, err := r.p.ecs.ListClusters(ctx, in)
+	cl, err := r.p.clients()
+	if err != nil {
+		return provider.Page{}, err
+	}
+	list, err := cl.ecs.ListClusters(ctx, in)
 	if err != nil {
 		return provider.Page{}, err
 	}
 	var rows []provider.Row
 	if len(list.ClusterArns) > 0 {
-		desc, err := r.p.ecs.DescribeClusters(ctx, &ecs.DescribeClustersInput{Clusters: list.ClusterArns})
+		desc, err := cl.ecs.DescribeClusters(ctx, &ecs.DescribeClustersInput{Clusters: list.ClusterArns})
 		if err != nil {
 			return provider.Page{}, err
 		}
@@ -148,13 +152,17 @@ func (r ecsServices) List(ctx context.Context, q provider.Query) (provider.Page,
 	if q.Token != "" {
 		in.NextToken = awssdk.String(q.Token)
 	}
-	list, err := r.p.ecs.ListServices(ctx, in)
+	cl, err := r.p.clients()
+	if err != nil {
+		return provider.Page{}, err
+	}
+	list, err := cl.ecs.ListServices(ctx, in)
 	if err != nil {
 		return provider.Page{}, err
 	}
 	var rows []provider.Row
 	for _, arns := range chunk(list.ServiceArns, ecsDescribeServicesMax) {
-		desc, err := r.p.ecs.DescribeServices(ctx, &ecs.DescribeServicesInput{Cluster: &r.cluster, Services: arns})
+		desc, err := cl.ecs.DescribeServices(ctx, &ecs.DescribeServicesInput{Cluster: &r.cluster, Services: arns})
 		if err != nil {
 			return provider.Page{}, err
 		}
@@ -221,13 +229,17 @@ func (r ecsTasks) List(ctx context.Context, q provider.Query) (provider.Page, er
 	if q.Token != "" {
 		in.NextToken = awssdk.String(q.Token)
 	}
-	list, err := r.p.ecs.ListTasks(ctx, in)
+	cl, err := r.p.clients()
+	if err != nil {
+		return provider.Page{}, err
+	}
+	list, err := cl.ecs.ListTasks(ctx, in)
 	if err != nil {
 		return provider.Page{}, err
 	}
 	var rows []provider.Row
 	if len(list.TaskArns) > 0 {
-		desc, err := r.p.ecs.DescribeTasks(ctx, &ecs.DescribeTasksInput{Cluster: &r.cluster, Tasks: list.TaskArns})
+		desc, err := cl.ecs.DescribeTasks(ctx, &ecs.DescribeTasksInput{Cluster: &r.cluster, Tasks: list.TaskArns})
 		if err != nil {
 			return provider.Page{}, err
 		}
@@ -297,7 +309,11 @@ func (r ecsTasks) Drill(ctx context.Context, row provider.Row) (provider.Drill, 
 	if ref.ContainerInstanceARN == "" {
 		return provider.Drill{}, errors.New("task has no EC2 container instance (Fargate?)")
 	}
-	out, err := r.p.ecs.DescribeContainerInstances(ctx, &ecs.DescribeContainerInstancesInput{
+	cl, err := r.p.clients()
+	if err != nil {
+		return provider.Drill{}, err
+	}
+	out, err := cl.ecs.DescribeContainerInstances(ctx, &ecs.DescribeContainerInstancesInput{
 		Cluster: &ref.Cluster, ContainerInstances: []string{ref.ContainerInstanceARN},
 	})
 	if err != nil {
