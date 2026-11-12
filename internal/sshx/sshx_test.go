@@ -53,7 +53,7 @@ func TestArgsIncludeKeyOnlyWhenPemExists(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ = Resolve(h, "u", "private", dir)
-	if want := []string{"-i", pem, "u@10.0.0.5"}; !reflect.DeepEqual(got.Args(), want) {
+	if want := []string{"-i", pem, "-o", "IdentitiesOnly=yes", "u@10.0.0.5"}; !reflect.DeepEqual(got.Args(), want) {
 		t.Fatalf("with pem: got %v", got.Args())
 	}
 }
@@ -113,7 +113,7 @@ func TestDemoCommandShowsTheCommandAndRunsOnlyALocalShell(t *testing.T) {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("demo shell: %v\n%s", err, out.String())
 	}
-	for _, want := range []string{"[demo] would run:", "ssh -i '/tmp/my key.pem' ubuntu@10.0.1.5", "local shell", "reached-the-local-shell"} {
+	for _, want := range []string{"[demo]", "│ Command │ ssh -i '/tmp/my key.pem' ubuntu@10.0.1.5", "│ User    │ ubuntu", "local shell", "reached-the-local-shell"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
 		}
@@ -124,6 +124,57 @@ func TestShellQuote(t *testing.T) {
 	for in, want := range map[string]string{"plain": "plain", "ubuntu@10.0.0.1": "ubuntu@10.0.0.1", "a b": "'a b'", "it's": `'it'\''s'`, "$(x)": "'$(x)'"} {
 		if got := shellQuote(in); got != want {
 			t.Errorf("shellQuote(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestPemNotes(t *testing.T) {
+	dir := t.TempDir()
+	h := provider.Host{PrivateIP: "10.0.0.5", KeyName: "prod"}
+
+	got, _ := Resolve(h, "u", "private", dir)
+	if got.KeyFile != "" || !strings.Contains(got.KeyNote, "no "+filepath.Join(dir, "prod.pem")) {
+		t.Fatalf("missing pem must be explained: %+v", got)
+	}
+
+	pem := filepath.Join(dir, "prod.pem")
+	if err := os.WriteFile(pem, nil, 0o644); err != nil { //nolint:gosec // testing the too-open warning
+		t.Fatal(err)
+	}
+	got, _ = Resolve(h, "u", "private", dir)
+	if got.KeyFile != pem || !got.OnlyKey || !strings.Contains(got.KeyNote, "chmod 600") {
+		t.Fatalf("open permissions must be flagged but the key still used: %+v", got)
+	}
+	_ = os.Chmod(pem, 0o600)
+	if got, _ = Resolve(h, "u", "private", dir); got.KeyNote != "" {
+		t.Fatalf("a good pem needs no note: %q", got.KeyNote)
+	}
+}
+
+func TestPemNameCannotEscapeTheDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(filepath.Dir(dir), "evil.pem"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"../evil", "a/b", ".."} {
+		got, _ := Resolve(provider.Host{PrivateIP: "10.0.0.5", KeyName: name}, "u", "private", dir)
+		if got.KeyFile != "" || got.KeyNote == "" {
+			t.Errorf("key name %q must be ignored with a note: %+v", name, got)
+		}
+	}
+}
+
+func TestDemoTableRowsAndWrapping(t *testing.T) {
+	long := "/var/folders/" + strings.Repeat("x", 90) + "/id_ed25519"
+	tbl := Target{User: "ec2-user", Address: "10.0.0.4", KeyFile: long, OnlyKey: true, Port: 22}.DemoTable()
+	for _, want := range []string{"┌", "└", "│ User", "│ Address", "│ Port", "│ Key", "only this key", "│ Command"} {
+		if !strings.Contains(tbl, want) {
+			t.Errorf("table lacks %q:\n%s", want, tbl)
+		}
+	}
+	for _, l := range strings.Split(strings.TrimSpace(tbl), "\n")[1:] {
+		if n := len([]rune(l)); n > demoWrap+20 {
+			t.Errorf("row too wide (%d): %s", n, l)
 		}
 	}
 }

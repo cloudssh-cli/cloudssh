@@ -230,7 +230,11 @@ func (sm *sshModal) preview() string {
 	if err != nil {
 		return errorStyle.Render(err.Error())
 	}
-	return statusStyle.Render("ssh " + strings.Join(t.Args(), " "))
+	out := statusStyle.Render("ssh " + strings.Join(t.Args(), " "))
+	if t.KeyNote != "" {
+		out += "\n  " + errorStyle.Render("key: "+t.KeyNote)
+	}
+	return out
 }
 
 func (sm *sshModal) view(w, h int) string {
