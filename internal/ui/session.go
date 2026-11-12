@@ -54,7 +54,15 @@ func (c *cleanSession) Run() error {
 	}
 	if w != nil {
 		_, _ = fmt.Fprint(w, clearScreen)
+		// The session ran on the terminal's normal screen, which is what the
+		// user's shell shows after cloudssh quits: wipe what it printed so
+		// none of it is left behind (scrollback is never touched).
+		defer func() { _, _ = fmt.Fprint(w, clearScreen) }()
 	}
+	return c.run(w)
+}
+
+func (c *cleanSession) run(w io.Writer) error {
 	tail := &tailBuffer{max: 4096}
 	// Only ssh is watched: a piped stderr would also stop a local shell
 	// (the demo session) from using the terminal for job control.

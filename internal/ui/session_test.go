@@ -91,3 +91,19 @@ func fakeSSH(t *testing.T, script string) *exec.Cmd {
 	}
 	return exec.Command(path)
 }
+
+func TestSessionOutputIsWipedWhenItEnds(t *testing.T) {
+	cmd := exec.Command("sh", "-c", "echo session-output")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := (&cleanSession{cmd: cmd}).Run(); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	if !strings.HasSuffix(got, clearScreen) || !strings.Contains(got, "session-output") {
+		t.Fatalf("the screen must be cleared again after the session, so nothing is left behind: %q", got)
+	}
+	if strings.Contains(got, "\x1b[3J") {
+		t.Fatal("must not wipe the user's scrollback")
+	}
+}
