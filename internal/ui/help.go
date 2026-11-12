@@ -43,6 +43,9 @@ func helpSections(m *Model) []helpSection {
 	if len(names) > 0 {
 		views = append(views, helpEntry{"1-" + fmt.Sprint(len(names)), strings.Join(names, " · ")})
 	}
+	if m.auth != nil && m.hasProfiles {
+		views = append(views, helpEntry{"p", "Profiles: switch the sign-in profile (enter)"})
+	}
 	views = append(views, helpEntry{"?", "This help"}, helpEntry{"q  ctrl+c", "Quit"})
 
 	secs := []helpSection{

@@ -34,6 +34,7 @@ var (
 	crumbActive   = lipgloss.NewStyle().Bold(true).Foreground(colBlack).Background(colSecondary)
 	statusStyle   = lipgloss.NewStyle().Foreground(colSecondary)
 	errorStyle    = lipgloss.NewStyle().Foreground(colErr)
+	warnStyle     = lipgloss.NewStyle().Foreground(colWarn)
 )
 
 // stateStyles colours well-known resource states, k9s style.

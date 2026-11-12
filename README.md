@@ -19,7 +19,9 @@ make run     # run the TUI in a container
 cloudssh --profile prod --region us-east-1
 ```
 
-cloudssh uses the standard AWS credential chain (`--profile`, `AWS_PROFILE`, SSO, environment keys, instance role). It checks the credentials before the UI starts: a missing profile, no credentials, or an expired SSO session exits with a message that says how to fix it.
+cloudssh uses the standard AWS credential chain (`--profile`, `AWS_PROFILE`, SSO, environment keys, instance role) and always shows how it is signed in at the top (`Access: profile prod · SSO`, `environment keys`, `instance role`, ...). If you use environment keys or a role there is nothing to set up.
+
+If it cannot sign in (profile not found, no credentials yet, expired SSO session) the app still starts. It explains what is missing and opens the **Profiles** screen, a table of the profiles on your machine (auth type, region, details): pick one with `enter`, or press `r` to try again after `aws sso login` in another terminal. With no profiles at all it says so kindly and tells you how to create one. You can switch profile at any time with `p`.
 
 Start on a specific screen with `--view dashboard|ec2|ecs|eks|asg|vpc`. Press `?` in the app for the full list of keys, including the sort key of every column on the current screen.
 
@@ -36,6 +38,7 @@ Start on a specific screen with `--view dashboard|ec2|ecs|eks|asg|vpc`. Press `?
 | `shift`+letter | sort by a column, again to reverse (letters listed in `?`) |
 | `r` · `R` | refresh · reset filters, search and sort to defaults |
 | `n` `shift+→` | load next page |
+| `p` | profiles: switch the sign-in profile at any time (`enter` uses it, `esc` goes back) |
 | `?` | help |
 | `q` | quit |
 

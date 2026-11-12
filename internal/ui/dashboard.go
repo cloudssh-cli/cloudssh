@@ -31,13 +31,16 @@ func logoLines(style lipgloss.Style, w int) []string {
 
 // dashboardLines renders the logo and the shortcut table (shortcut, screen,
 // description) inside a w x h area.
-func dashboardLines(res []provider.Resource, w, h int) []string {
+func dashboardLines(res []provider.Resource, profiles bool, w, h int) []string {
 	type entry struct{ key, name, desc string }
 	entries := []entry{{"d, 0", "Dashboard", "This dashboard"}}
 	for i, r := range res {
 		if i < 9 {
 			entries = append(entries, entry{fmt.Sprint(i + 1), r.Label(), "List and open " + strings.ToLower(r.Label())})
 		}
+	}
+	if profiles {
+		entries = append(entries, entry{"p", "Profiles", "Switch the sign-in profile"})
 	}
 	entries = append(entries, entry{"?", "Help", "All key bindings"}, entry{"q", "Quit", "Quit application"})
 

@@ -195,10 +195,18 @@ func (t *table) render(title, empty string) string {
 	lines := make([]string, 0, bodyH)
 
 	if len(t.rows) == 0 {
+		// the message is centred as one block; its lines stay left-aligned so lists read well
+		msg := strings.Split(empty, "\n")
+		blockW := 0
+		for _, l := range msg {
+			blockW = max(blockW, lipgloss.Width(l))
+		}
+		pad := strings.Repeat(" ", max((inner-blockW)/2, 0))
+		first := max((bodyH-len(msg))/2, 0)
 		for i := 0; i < bodyH; i++ {
 			l := ""
-			if i == bodyH/2 {
-				l = statusStyle.Render(center(empty, inner))
+			if i >= first && i-first < len(msg) {
+				l = statusStyle.Render(fit(pad+msg[i-first], inner))
 			}
 			lines = append(lines, l)
 		}
