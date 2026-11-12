@@ -27,10 +27,10 @@ const credentialsTimeout = 10 * time.Second
 // clients are the service clients for one profile. They are replaced as a
 // whole when the user switches profile.
 type clients struct {
-	ec2 *ec2.Client
-	asg *autoscaling.Client
-	ecs *ecs.Client
-	eks *eks.Client
+	ec2 ec2API
+	asg asgAPI
+	ecs ecsAPI
+	eks eksAPI
 	eic instanceConnect
 }
 
@@ -44,6 +44,7 @@ type Provider struct {
 	authErr error
 	region  string
 	access  string // header text, e.g. "profile prod · SSO"
+	demo    *demoState
 }
 
 var (
@@ -93,6 +94,9 @@ func buildClients(ctx context.Context, profile, regionFlag string) (*clients, st
 
 // UseProfile (re)connects with profile and records the outcome.
 func (p *Provider) UseProfile(ctx context.Context, profile string) error {
+	if p.demo != nil {
+		return p.useDemo(profile)
+	}
 	cl, region, access, err := buildClients(ctx, profile, p.regionFlag)
 	p.mu.Lock()
 	defer p.mu.Unlock()

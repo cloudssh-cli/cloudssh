@@ -225,12 +225,19 @@ func TestEKSRowsAndDrills(t *testing.T) {
 	}
 }
 
-func TestEveryResourceHasConsistentMetadata(t *testing.T) {
-	all := []provider.Resource{
+// allResources lists every resource type of this package, top-level and
+// drill-only. It is the single place to register a new resource: the metadata
+// test and the demo-data conformance test (demo_test.go) both read it, so a
+// resource without sample data fails the build.
+func allResources() []provider.Resource {
+	return []provider.Resource{
 		&instances{}, &asgs{}, &vpcs{}, &subnets{}, &ecsClusters{}, &ecsServices{cluster: "c"}, &ecsTasks{cluster: "c", service: "s"},
 		&eksClusters{}, &eksNodeGroups{cluster: "c"},
 	}
-	for _, r := range all {
+}
+
+func TestEveryResourceHasConsistentMetadata(t *testing.T) {
+	for _, r := range allResources() {
 		if r.Key() == "" || r.Name() == "" || r.Crumb() == "" || len(r.Columns()) == 0 {
 			t.Errorf("%T has empty metadata", r)
 		}

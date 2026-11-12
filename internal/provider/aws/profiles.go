@@ -108,7 +108,14 @@ func awsFile(env, rel string) string {
 }
 
 // Profiles lists the profiles configured on this machine.
-func (*Provider) Profiles() []provider.ProfileInfo {
+func (p *Provider) Profiles() []provider.ProfileInfo {
+	if p.demo != nil {
+		out := make([]provider.ProfileInfo, 0, len(p.demo.accounts))
+		for _, a := range p.demo.accounts {
+			out = append(out, a.profile)
+		}
+		return out
+	}
 	read := func(path string) string {
 		if path == "" {
 			return ""
