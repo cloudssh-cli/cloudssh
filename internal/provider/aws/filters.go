@@ -13,10 +13,17 @@ type filterSpec struct {
 	exact     bool   // exact match; otherwise the value is wrapped in *...*
 }
 
+// shortNames are the compact header labels ("name=web").
+var shortNames = map[string]string{
+	"instance-name": "name", "auto-scaling-group": "asg", "private-ip": "ip", "instance-type": "type", "public-ip": "public-ip",
+	"availability-zone": "az", "state": "state", "instance-id": "id", "subnet-id": "subnet",
+	"vpc-name": "name", "vpc-id": "vpc", "vpc-cidr": "cidr", "vpc-default": "default", "vpc-state": "state", "subnet-name": "name",
+}
+
 func defsOf(specs []filterSpec) []provider.FilterDef {
 	out := make([]provider.FilterDef, len(specs))
 	for i, s := range specs {
-		out[i] = provider.FilterDef{Key: s.key, Name: s.name}
+		out[i] = provider.FilterDef{Key: s.key, Name: s.name, Short: shortNames[s.key]}
 	}
 	return out
 }

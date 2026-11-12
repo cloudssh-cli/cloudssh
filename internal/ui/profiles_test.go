@@ -49,7 +49,7 @@ func (f *fakeAuthn) UseProfile(_ context.Context, name string) error {
 	if name == "" {
 		f.access = "environment keys"
 	} else {
-		f.access = "profile " + name + " · SSO"
+		f.access = "SSO (" + name + ")"
 	}
 	return nil
 }
@@ -86,7 +86,7 @@ func TestSignedOutStartsOnTheProfilesScreenWithAFriendlyMessage(t *testing.T) {
 		t.Fatalf("mode=%d resource loads=%d: the app must wait for a profile", m.mode, len(rec.queries))
 	}
 	v := m.View()
-	for _, want := range []string{"Profiles[2]", "dev", "prod", "SSO", "access keys", "eu-west-1", "Access: not signed in",
+	for _, want := range []string{"Profiles[2]", "dev", "prod", "SSO", "access keys", "eu-west-1", "Auth: not signed in",
 		"No AWS credentials found yet.", "Use profile", "Try again", "<profiles>"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("signed-out screen missing %q:\n%s", want, v)
@@ -112,7 +112,7 @@ func TestChoosingAProfileSignsInAndLoadsTheApp(t *testing.T) {
 		t.Fatalf("authErr=%v mode=%d: choosing a profile should open the app", m.authErr, m.mode)
 	}
 	v := m.View()
-	for _, want := range []string{"Access: profile dev · SSO", "Region: eu-west-1", "<p>"} {
+	for _, want := range []string{"Auth: SSO (dev)", "fake · eu-west-1", "<p>"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("after sign-in missing %q", want)
 		}
@@ -147,7 +147,7 @@ func TestNoProfilesYetIsExplainedGentlyAndRetryWorks(t *testing.T) {
 	f := &fakeAuthn{err: errNoCreds} // nothing configured at all
 	m := signIn(t, f, rec)
 	v := m.View()
-	for _, want := range []string{"No AWS credentials found yet.", "completely normal", "aws configure sso", "press r to try again"} {
+	for _, want := range []string{"No AWS credentials found yet.", "which is normal", "aws configure sso", "then press r"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("empty state missing %q:\n%s", want, v)
 		}
@@ -163,9 +163,9 @@ func TestNoProfilesYetIsExplainedGentlyAndRetryWorks(t *testing.T) {
 
 func TestSwitchProfilesAtAnyTime(t *testing.T) {
 	rec := &recorder{}
-	f := &fakeAuthn{profile: "dev", access: "profile dev · SSO", profiles: twoProfs, region: "eu-west-1"}
+	f := &fakeAuthn{profile: "dev", access: "SSO (dev)", profiles: twoProfs, region: "eu-west-1"}
 	m := signIn(t, f, rec)
-	if v := m.View(); !strings.Contains(v, "Access: profile dev · SSO") || !strings.Contains(v, "<p>") {
+	if v := m.View(); !strings.Contains(v, "Auth: SSO (dev)") || !strings.Contains(v, "<p>") {
 		t.Fatalf("header should show the access and the p shortcut:\n%s", v)
 	}
 	loads := len(rec.queries)
@@ -203,7 +203,7 @@ func TestSwitchProfilesAtAnyTime(t *testing.T) {
 	if m.cur().id == oldScreen || len(rec.queries) <= loads {
 		t.Fatal("switching profile must drop what was loaded for the old account and reload")
 	}
-	if v := m.View(); !strings.Contains(v, "Access: profile prod · SSO") {
+	if v := m.View(); !strings.Contains(v, "Auth: SSO (prod)") {
 		t.Fatalf("header should follow the switch:\n%s", v)
 	}
 }
@@ -213,7 +213,7 @@ func TestEnvironmentKeysNeedNoProfileSetup(t *testing.T) {
 	f := &fakeAuthn{access: "environment keys", region: "us-east-1"} // no profiles on this machine
 	m := signIn(t, f, rec)
 	v := m.View()
-	if !strings.Contains(v, "Access: environment keys") {
+	if !strings.Contains(v, "Auth: environment keys") {
 		t.Fatalf("header should say how we are signed in:\n%s", v)
 	}
 	if strings.Contains(v, "<p>") {
@@ -262,7 +262,7 @@ func TestPWithoutProfilesSupportSaysSo(t *testing.T) {
 }
 
 func TestProfilesScreenListsInHelpAndDashboard(t *testing.T) {
-	f := &fakeAuthn{profile: "dev", access: "profile dev · SSO", profiles: twoProfs}
+	f := &fakeAuthn{profile: "dev", access: "SSO (dev)", profiles: twoProfs}
 	m := signIn(t, f, &recorder{})
 	h, _ := send(m, key("?"))
 	if !strings.Contains(h.View(), "Profiles: switch the sign-in profile") {
@@ -285,7 +285,7 @@ func TestProfileStatesFitTheScreen(t *testing.T) {
 			return settle(m, cmd)
 		},
 		"profiles open": func() Model {
-			m := signIn(t, &fakeAuthn{profile: "dev", access: "profile dev · SSO", profiles: twoProfs}, &recorder{})
+			m := signIn(t, &fakeAuthn{profile: "dev", access: "SSO (dev)", profiles: twoProfs}, &recorder{})
 			m, cmd := send(m, key("p"))
 			return settle(m, cmd)
 		},
@@ -307,7 +307,7 @@ func TestProfileStatesFitTheScreen(t *testing.T) {
 }
 
 func TestOpeningProfilesRestsTheCursorOnTheActiveOne(t *testing.T) {
-	f := &fakeAuthn{profile: "prod", access: "profile prod · SSO", profiles: twoProfs}
+	f := &fakeAuthn{profile: "prod", access: "SSO (prod)", profiles: twoProfs}
 	m := signIn(t, f, &recorder{})
 	m, cmd := send(m, key("p"))
 	m = settle(m, cmd)

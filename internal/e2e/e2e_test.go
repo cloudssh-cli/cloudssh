@@ -128,7 +128,7 @@ func mustNotContain(t *testing.T, m ui.Model, nots ...string) {
 
 func TestDemoOpensOnRunningInstancesAndSaysItIsADemo(t *testing.T) {
 	m := demo(t)
-	mustContain(t, m, "Cloud: aws · DEMO (sample data)", "Access: profile acme-prod · SSO", "Region: us-east-1",
+	mustContain(t, m, "Cloud: aws · us-east-1 · demo", "Auth: SSO (acme-prod)", "aws · us-east-1",
 		"Instances[", "api-prod-1", "bastion-01", "running", "Pages: 1+", "<ec2_instances>")
 	mustNotContain(t, m, "postgres-replica", "old-build-agent") // stopped and terminated hide behind the default state filter
 }
@@ -161,7 +161,7 @@ func TestFiltersDialogQueriesTheServer(t *testing.T) {
 	m = press(m, "up", "up", "up", "up", "up", "up") // from Instance State (7th row) up to Instance Name
 	m = typeText(m, "ecs-prod")
 	m = press(m, "enter")
-	mustContain(t, m, "ecs-prod-apps-1", "ecs-prod-apps-2", "ecs-prod-apps-3", "Instance Name=ecs-prod")
+	mustContain(t, m, "ecs-prod-apps-1", "ecs-prod-apps-2", "ecs-prod-apps-3", "name=ecs-prod")
 	mustNotContain(t, m, "web-prod-1", "bastion-01")
 }
 
@@ -236,12 +236,12 @@ func TestSwitchingProfilesChangesTheWholeApp(t *testing.T) {
 	m = press(m, "p")
 	mustContain(t, m, "Profiles[3]", "acme-prod", "acme-staging", "sandbox", "●", "SSO", "access keys", "123456789012 AdministratorAccess")
 	m = press(m, "j", "j", "enter") // sandbox
-	mustContain(t, m, "Access: profile sandbox · access keys", "Region: us-west-2", "playground")
+	mustContain(t, m, "Auth: access keys (sandbox)", "aws · us-west-2", "playground")
 	mustNotContain(t, m, "bastion-01")
 	m = press(m, "4")
-	mustContain(t, m, "No auto scaling groups found!")                   // the sandbox account is tiny: the empty state
-	m = press(m, "p", "k", "k", "enter")                                 // the cursor rests on the active profile (sandbox); two up is acme-prod
-	mustContain(t, m, "Access: profile acme-prod · SSO", "web-prod-asg") // back on the screen we came from, now for acme-prod
+	mustContain(t, m, "No auto scaling groups found!")         // the sandbox account is tiny: the empty state
+	m = press(m, "p", "k", "k", "enter")                       // the cursor rests on the active profile (sandbox); two up is acme-prod
+	mustContain(t, m, "Auth: SSO (acme-prod)", "web-prod-asg") // back on the screen we came from, now for acme-prod
 }
 
 func TestUnknownDemoProfileStartsSignedOutAndRecovers(t *testing.T) {
@@ -250,9 +250,9 @@ func TestUnknownDemoProfileStartsSignedOutAndRecovers(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := start(t, p, 150, 40)
-	mustContain(t, m, "Access: not signed in", `There is no demo profile called "nope".`, "acme-prod", "Profiles[3]", "Use profile")
+	mustContain(t, m, "Auth: not signed in", `There is no demo profile called "nope".`, "acme-prod", "Profiles[3]", "Use profile")
 	m = press(m, "enter") // acme-prod
-	mustContain(t, m, "Access: profile acme-prod · SSO", "bastion-01")
+	mustContain(t, m, "Auth: SSO (acme-prod)", "bastion-01")
 }
 
 func TestEveryDemoScreenFitsTheTerminal(t *testing.T) {

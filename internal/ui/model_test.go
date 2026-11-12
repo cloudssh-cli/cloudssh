@@ -535,7 +535,7 @@ func TestDemoModeIsMarkedAndNeverStartsRealSSH(t *testing.T) {
 	res := fakeResource{pages: map[string]provider.Page{"": {Rows: rows("a")}}}
 	m := sized(New(testCfg(), demoProvider{fakeProvider{res: []provider.Resource{res}}}), 120, 30)
 	m = settle(m, m.Init())
-	if v := m.View(); !strings.Contains(v, "DEMO (sample data)") {
+	if v := m.View(); !strings.Contains(v, "· demo") {
 		t.Fatalf("the header must say this is a demo:\n%s", v)
 	}
 	if m.detectTunnels != nil {
@@ -549,7 +549,7 @@ func TestDemoModeIsMarkedAndNeverStartsRealSSH(t *testing.T) {
 	if got := real.command(target); got.Args[0] != "ssh" {
 		t.Fatalf("a normal session runs ssh, got %v", got.Args)
 	}
-	if strings.Contains(real.View(), "DEMO") {
+	if strings.Contains(real.View(), "· demo") {
 		t.Error("only demo sessions are marked")
 	}
 }

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -121,25 +122,41 @@ func (s *screen) sshable() bool {
 	return false
 }
 
-func (s *screen) filterName(key string) string {
+// short is the compact label of a filter key ("name"), falling back to the key.
+func (s *screen) short(key string) string {
 	for _, d := range s.res.Filters() {
-		if d.Key == key {
-			return d.Name
+		if d.Key == key && d.Short != "" {
+			return d.Short
 		}
 	}
 	return key
 }
 
-// filterSummary is e.g. "Instance State=running, Instance Name=web".
-func (s *screen) filterSummary() string {
-	var parts []string
+// filterChips is the active filters as "state=running name=web", fitted to
+// width with a "+N" for what does not fit. Empty when no filter is active.
+func (s *screen) filterChips(width int) string {
+	var chips []string
 	for _, f := range s.filters {
 		if f.Value != "" {
-			parts = append(parts, s.filterName(f.Key)+"="+f.Value)
+			chips = append(chips, s.short(f.Key)+"="+f.Value)
 		}
 	}
-	if len(parts) == 0 {
-		return "none"
+	out := ""
+	for i, c := range chips {
+		next := out
+		if next != "" {
+			next += " "
+		}
+		next += c
+		rest := len(chips) - i - 1
+		extra := 0
+		if rest > 0 {
+			extra = len(fmt.Sprintf(" +%d", rest))
+		}
+		if len(next)+extra > width && out != "" {
+			return fmt.Sprintf("%s +%d", out, len(chips)-i)
+		}
+		out = next
 	}
-	return strings.Join(parts, ", ")
+	return fit(strings.TrimRight(out, " "), min(len(out), width))
 }

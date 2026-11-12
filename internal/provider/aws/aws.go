@@ -43,7 +43,7 @@ type Provider struct {
 	cl      *clients
 	authErr error
 	region  string
-	access  string // header text, e.g. "profile prod · SSO"
+	access  string // header text, e.g. "SSO (prod)"
 	demo    *demoState
 }
 
@@ -125,7 +125,7 @@ func (p *Provider) Profile() string {
 	return os.Getenv("AWS_PROFILE")
 }
 
-// Access says how we are signed in ("profile prod · SSO", "environment keys", ...).
+// Access says how we are signed in ("SSO (prod)", "environment keys", ...).
 func (p *Provider) Access() string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

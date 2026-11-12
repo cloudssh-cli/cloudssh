@@ -350,7 +350,7 @@ func TestFiltersModalAppliesAndReloads(t *testing.T) {
 	if len(q.Filters) != 2 || q.Filters[0] != want[0] || q.Filters[1] != want[1] {
 		t.Fatalf("applied filters: %+v", q.Filters)
 	}
-	if !strings.Contains(m.View(), "Instance Name=web") {
+	if !strings.Contains(m.View(), "name=web") {
 		t.Fatal("header should summarise active filters")
 	}
 }
@@ -460,7 +460,7 @@ func TestSplashShowsFadesAndCanBeSkipped(t *testing.T) {
 
 func TestViewHasHeaderPanelTitleAndBreadcrumbs(t *testing.T) {
 	v := loaded(t, threeRows()).View()
-	for _, want := range []string{"Cloud:", "Filters:", "Loaded:", "<enter/S>", "<r>", "<?>", "Fake[3]<all>", "<fake_fake>", "Pages: 1+", "alpha"} {
+	for _, want := range []string{"Cloud:", "<enter/S>", "<r>", "<?>", "Fake[3]<all>", "<fake_fake>", "Pages: 1+", "alpha"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("view missing %q", want)
 		}
@@ -524,11 +524,11 @@ func TestEveryStateFitsTheScreen(t *testing.T) {
 
 func TestHelpHintSurvivesNarrowTerminals(t *testing.T) {
 	m := sized(loaded(t, threeRows()), 60, 14)
-	if !strings.Contains(m.View(), "<?> Help") {
+	if v := m.View(); !strings.Contains(v, "<?>") || !strings.Contains(v, "Help") {
 		t.Fatal("help hint must always be visible")
 	}
 	d, _ := send(m, key("d"))
-	if !strings.Contains(d.View(), "<?> Help") {
+	if v := d.View(); !strings.Contains(v, "<?>") || !strings.Contains(v, "Help") {
 		t.Fatal("help hint must be visible on the dashboard too")
 	}
 }
@@ -537,7 +537,7 @@ func TestHeaderListsOnlyActionShortcuts(t *testing.T) {
 	m := sized(loaded(t, filterable(&recorder{})), 220, 30)
 	v := m.View()
 	for _, want := range []string{"SSH session", "Update filters", "Open search", "Refresh data", "Reset defaults", "Next page",
-		"Switch view", "Dashboard", "Help", "Quit"} {
+		"Dashboard", "Help", "Quit"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("wide header missing %q", want)
 		}

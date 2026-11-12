@@ -123,11 +123,11 @@ func accessKind(source string) string {
 	return "AWS credentials"
 }
 
-// describeAccess is the header text: "profile prod · SSO" or "environment keys".
+// describeAccess is the header text: "SSO (prod)" or "environment keys".
 func describeAccess(profile, source string) string {
 	kind := accessKind(source)
 	if profile == "" {
 		return kind
 	}
-	return "profile " + profile + " · " + kind
+	return kind + " (" + profile + ")"
 }

@@ -46,6 +46,8 @@ type Page struct {
 type FilterDef struct {
 	Key  string // stable identifier, e.g. "instance-name"
 	Name string // human label, e.g. "Instance Name"
+	// Short is a compact label for the header ("name"); defaults to Key.
+	Short string
 }
 
 // Filter is an applied filter: a FilterDef.Key plus the user's value.
@@ -142,7 +144,9 @@ type Authenticator interface {
 	// AuthError is nil when ready. Otherwise it is a friendly explanation:
 	// the first line is a headline, the rest is guidance.
 	AuthError() error
-	// Access says how the app is signed in, for the header, e.g. "profile prod · SSO".
+	// Access says how the app is signed in, for the header: the kind of
+	// credential and, when there is one, the profile: "SSO (prod)",
+	// "environment keys", "instance role".
 	Access() string
 	// Region is the region in use, if known.
 	Region() string

@@ -370,7 +370,7 @@ func buildDemoAccounts(now time.Time) []*demoAccount {
 func demoProd(now time.Time) *demoAccount {
 	b := newBuilder(1, now, "us-east-1",
 		provider.ProfileInfo{Name: "acme-prod", Kind: "SSO", Region: "us-east-1", Detail: "123456789012 AdministratorAccess"},
-		"profile acme-prod · SSO", "123456789012")
+		"SSO (acme-prod)", "123456789012")
 	al2023 := b.image("al2023", "Amazon Linux 2023 AMI 2023.5.20240805.0 x86_64 HVM kernel-6.1")
 	ubuntu := b.image("ubuntu", "Canonical, Ubuntu, 22.04 LTS, amd64 jammy image build on 2024-07-23")
 	debianARM := b.image("debian", "Debian 12 (20240717-1811) arm64")
@@ -453,7 +453,7 @@ func demoProd(now time.Time) *demoAccount {
 func demoStaging(now time.Time) *demoAccount {
 	b := newBuilder(2, now, "eu-west-1",
 		provider.ProfileInfo{Name: "acme-staging", Kind: "SSO", Region: "eu-west-1", Detail: "210987654321 PowerUserAccess"},
-		"profile acme-staging · SSO", "210987654321")
+		"SSO (acme-staging)", "210987654321")
 	ubuntu := b.image("ubuntu", "Canonical, Ubuntu, 24.04 LTS, amd64 noble image build on 2024-07-01")
 	al2023 := b.image("al2023", "Amazon Linux 2023 AMI 2023.5.20240805.0 x86_64 HVM kernel-6.1")
 
@@ -485,7 +485,7 @@ func demoStaging(now time.Time) *demoAccount {
 func demoSandbox(now time.Time) *demoAccount {
 	b := newBuilder(3, now, "us-west-2",
 		provider.ProfileInfo{Name: "sandbox", Kind: "access keys", Region: "us-west-2"},
-		"profile sandbox · access keys", "555566667777")
+		"access keys (sandbox)", "555566667777")
 	al2023 := b.image("al2023", "Amazon Linux 2023 AMI 2023.5.20240805.0 x86_64 HVM kernel-6.1")
 	def := b.vpc("", "172.31.0.0/16", true)
 	b.sub("default-a", "", def, "172.31.0.0/20", 0, true)

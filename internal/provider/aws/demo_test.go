@@ -46,7 +46,7 @@ func TestOpenReturnsTheDemoWhenAsked(t *testing.T) {
 		t.Fatal("Open(Demo) must return a Demoer")
 	}
 	a := p.(provider.Authenticator)
-	if a.AuthError() != nil || a.Profile() != "acme-prod" || a.Access() != "profile acme-prod · SSO" {
+	if a.AuthError() != nil || a.Profile() != "acme-prod" || a.Access() != "SSO (acme-prod)" {
 		t.Fatalf("starts as the first demo account: %v %q %q", a.AuthError(), a.Profile(), a.Access())
 	}
 	// an unknown demo profile shows the friendly signed-out state, not a crash
@@ -86,7 +86,7 @@ func TestSwitchingDemoProfilesChangesTheData(t *testing.T) {
 	if err := p.UseProfile(ctx, "sandbox"); err != nil {
 		t.Fatal(err)
 	}
-	if asgCount() != 0 || p.Region() != "us-west-2" || p.Access() != "profile sandbox · access keys" {
+	if asgCount() != 0 || p.Region() != "us-west-2" || p.Access() != "access keys (sandbox)" {
 		t.Fatalf("sandbox should be tiny and elsewhere: asgs=%d region=%s access=%q", asgCount(), p.Region(), p.Access())
 	}
 }

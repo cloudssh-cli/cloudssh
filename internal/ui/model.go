@@ -710,46 +710,35 @@ func (m Model) connect(s *screen) (tea.Model, tea.Cmd) {
 
 // ---- view ----
 
+// infos is the header's left block: where we are connected and how, plus any
+// active filter. Row counts are in the table title, so they are not repeated.
 func (m Model) infos() []info {
 	cloudName := m.prov.Name()
+	region := m.cfg.Region
+	if m.auth != nil && m.authErr == nil {
+		region = m.auth.Region()
+	}
+	if region != "" {
+		cloudName += " · " + region
+	}
 	if m.demo {
-		cloudName += " · DEMO (sample data)"
+		cloudName += " · demo" // plain: the user asked for it
 	}
 	out := []info{{"Cloud", cloudName}}
-	if m.auth != nil {
-		// how we are signed in: "profile prod · SSO", "environment keys", "instance role", ...
-		access := m.auth.Access()
-		if m.authErr != nil {
-			access = "not signed in"
-		}
-		out = append(out, info{"Access", access})
-		if r := m.auth.Region(); r != "" && m.authErr == nil {
-			out = append(out, info{"Region", r})
-		}
-	} else {
-		if m.cfg.Profile != "" {
-			out = append(out, info{"Profile", m.cfg.Profile})
-		}
-		if m.cfg.Region != "" {
-			out = append(out, info{"Region", m.cfg.Region})
-		}
+	switch {
+	case m.auth != nil && m.authErr != nil:
+		out = append(out, info{"Auth", "not signed in"})
+	case m.auth != nil:
+		out = append(out, info{"Auth", m.auth.Access()})
+	case m.cfg.Profile != "":
+		out = append(out, info{"Profile", m.cfg.Profile})
 	}
-	if s := m.cur(); s != nil && isProfiles(s) {
-		out = append(out, info{"Profiles", fmt.Sprintf("%d (%d shown)", len(s.rows), len(s.view))})
-	} else if s != nil {
-		sum := s.filterSummary()
-		out = append(out,
-			info{"Filters", ansiTrunc(sum, min(50, max(m.width/3, 20)))},
-			info{"Loaded", fmt.Sprintf("%d (%d shown)", len(s.rows), len(s.view))})
+	if s := m.cur(); s != nil && !isProfiles(s) {
+		if chips := s.filterChips(min(48, max(m.width/3, 16))); chips != "" {
+			out = append(out, info{"Filter", chips})
+		}
 	}
 	return out
-}
-
-func ansiTrunc(s string, w int) string {
-	if lipgloss.Width(s) <= w {
-		return s
-	}
-	return fit(s, w)
 }
 
 // hints lists the action shortcuts shown in the header. Navigation, sorting
@@ -757,16 +746,17 @@ func ansiTrunc(s string, w int) string {
 // the help screen (?), which keeps the header short and relevant. The header
 // flows hints into as many columns as the terminal fits.
 func (m Model) hints() []hint {
+	help := hint{"?", "Help"} // first, so it is always in the first column
 	if s := m.cur(); s != nil && isProfiles(s) {
-		h := []hint{{"enter", "Use profile"}, {"/ f s", "Open search"}}
+		h := []hint{help, {"enter", "Use profile"}, {"/ f s", "Open search"}}
 		if m.authErr != nil {
 			h = append(h, hint{"r", "Try again"})
 		} else {
 			h = append(h, hint{"r", "Refresh"}, hint{"esc  p", "Back"})
 		}
-		return append(h, hint{"?", "Help"}, hint{"q", "Quit"})
+		return append(h, hint{"q", "Quit"})
 	}
-	var h []hint
+	h := []hint{help}
 	if s := m.cur(); s != nil {
 		if s.sshable() {
 			if _, drill := s.drillable(); drill {
@@ -787,13 +777,13 @@ func (m Model) hints() []hint {
 			h = append(h, hint{"esc", "Go back"})
 		}
 	}
-	if len(m.resources) > 0 {
+	if len(m.resources) > 1 {
 		h = append(h, hint{fmt.Sprintf("1-%d", min(len(m.resources), 9)), "Switch view"})
 	}
 	if m.auth != nil && m.hasProfiles {
 		h = append(h, hint{"p", "Profiles"})
 	}
-	return append(h, hint{"d", "Dashboard"}, hint{"?", "Help"}, hint{"q", "Quit"})
+	return append(h, hint{"d", "Dashboard"}, hint{"q", "Quit"})
 }
 
 func (m Model) crumbs() []string {
@@ -827,16 +817,26 @@ func (m Model) emptyMessage(s *screen) string {
 	return "No " + strings.ToLower(s.res.Name()) + " found!"
 }
 
-// profilesEmpty is the friendly empty state of the profiles screen.
+// profilesEmpty is the friendly empty state of the profiles screen: short,
+// wrapped to the screen, and without the raw SDK error.
 func (m Model) profilesEmpty() string {
+	width := max(min(m.width-8, 72), 20)
+	var out []string
 	if m.authErr != nil {
-		return m.authErr.Error() + "\n\n" +
-			"There are no profiles on this machine yet. That is completely normal if you\n" +
-			"have not set one up before, and it only takes a minute (see the steps above).\n" +
-			"Once you are set up, press r to try again."
+		for _, l := range strings.Split(m.authErr.Error(), "\n") {
+			if !strings.HasPrefix(l, "details:") {
+				out = append(out, wrap(l, width)...)
+			}
+		}
+		out = append(out, "", "No profiles here yet, which is normal. Set one up, then press r.")
+	} else {
+		out = append(out, "No profiles are configured, and none are needed:", "you are signed in with "+m.auth.Access()+".")
 	}
-	return "No profiles are configured on this machine.\n" +
-		"That is fine: you are signed in with " + m.auth.Access() + ", so none are needed."
+	var wrapped []string
+	for _, l := range out {
+		wrapped = append(wrapped, wrap(l, width)...)
+	}
+	return strings.Join(wrapped, "\n")
 }
 
 func (m Model) footer(s *screen) string {
@@ -854,7 +854,7 @@ func (m Model) footer(s *screen) string {
 	}
 	l := strings.Join(left, " ")
 
-	r := hintKeyStyle.Render("<?>") + hintDescStyle.Render(" Help")
+	r := ""
 	if s != nil {
 		pages := hintKeyStyle.Render("...")
 		if !s.loading {
@@ -864,7 +864,7 @@ func (m Model) footer(s *screen) string {
 			}
 			pages = hintKeyStyle.Render(n)
 		}
-		r = "Pages: " + pages + "   " + r
+		r = "Pages: " + pages
 	}
 	gap := max(m.width-lipgloss.Width(l)-lipgloss.Width(r), 1)
 	line1 := fit(l+strings.Repeat(" ", gap)+r, m.width)

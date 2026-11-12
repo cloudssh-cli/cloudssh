@@ -58,13 +58,13 @@ func (e errorString) Error() string { return string(e) }
 func TestAccessDescriptions(t *testing.T) {
 	for _, c := range []struct{ profile, source, want string }{
 		{"", "EnvConfigCredentials", "environment keys"},
-		{"prod", "SSOProvider", "profile prod · SSO"},
-		{"ci", "AssumeRoleProvider", "profile ci · assumed role"},
-		{"dev", "SharedConfigCredentials: /home/me/.aws/credentials", "profile dev · access keys"},
+		{"prod", "SSOProvider", "SSO (prod)"},
+		{"ci", "AssumeRoleProvider", "assumed role (ci)"},
+		{"dev", "SharedConfigCredentials: /home/me/.aws/credentials", "access keys (dev)"},
 		{"", "EC2RoleProvider", "instance role"},
 		{"", "CredentialsEndpointProvider", "container role"},
 		{"", "WebIdentityCredentials", "web identity"},
-		{"x", "ProcessProvider", "profile x · credential process"},
+		{"x", "ProcessProvider", "credential process (x)"},
 		{"", "SomethingNew", "AWS credentials"},
 	} {
 		if got := describeAccess(c.profile, c.source); got != c.want {
@@ -167,7 +167,7 @@ func TestSwitchingProfilesWorksAtRuntimeAndBeatsEnvironmentKeys(t *testing.T) {
 		t.Fatalf("switch to dev: %v", err)
 	}
 	// ...but choosing a profile must really use that profile's keys and region
-	if p.Access() != "profile dev · access keys" || p.Profile() != "dev" || p.Region() != "eu-west-1" {
+	if p.Access() != "access keys (dev)" || p.Profile() != "dev" || p.Region() != "eu-west-1" {
 		t.Fatalf("after dev: access=%q profile=%q region=%q", p.Access(), p.Profile(), p.Region())
 	}
 	if err := p.UseProfile(context.Background(), "ops"); err != nil || p.Region() != "ap-south-1" || p.Profile() != "ops" {
