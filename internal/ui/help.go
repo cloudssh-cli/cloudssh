@@ -37,7 +37,7 @@ type helpModal struct {
 }
 
 func helpSections(m *Model) []helpSection {
-	views := []helpEntry{{"d  0", "Dashboard"}, {"{  }", "previous / next view"}}
+	views := []helpEntry{{"d  0", "Dashboard"}, {"{  }", "back / forward through views"}}
 	for i, r := range m.resources {
 		if i < 9 {
 			views = append(views, helpEntry{fmt.Sprint(i + 1), r.Label()})
@@ -57,7 +57,7 @@ func helpSections(m *Model) []helpSection {
 			{"/ f s", "search"}, {"F", "filters"}, {"r", "refresh"}, {"R", "reset filters, search, sort"}, {"n", "next page"},
 		}},
 		{title: "Search & filters", entries: []helpEntry{
-			{"a b  a&b", "and (space = whole conditions)"}, {"a|b  a,b", "or"}, {"!a", "not"}, {"( )", "group"},
+			{"a b  a&b", "and (space = whole conditions)"}, {"a|b  a,b", "or"}, {"!a", "not"}, {"( )", "group"}, {"\\|  \\\\", "a literal | or \\ (escape)"},
 			{"web&(api|db)", "web and either api or db"}, {"a|b !c", "(a or b), and not c"},
 			{"", "the same in search and in filters"},
 		}},

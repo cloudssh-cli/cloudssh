@@ -88,3 +88,29 @@ func TestExactOnServer(t *testing.T) {
 		}
 	}
 }
+
+func TestBackslashEscapes(t *testing.T) {
+	text := "a|b x&y (p) a b !hot back\\slash"
+	has := func(term string) bool { return strings.Contains(text, term) }
+	for q, want := range map[string]bool{
+		`a\|b`:        true,  // the text "a|b", not an OR
+		`a\|zzz`:      false, // no OR: "a|zzz" is absent
+		`x\&y`:        true,
+		`\(p\)`:       true,
+		`a\ b`:        true, // an escaped space stays inside the term
+		`\!hot`:       true, // "!hot" as text
+		`!\!hot`:      false,
+		`back\\slash`: true, // \\ is one backslash
+		`zzz\|a`:      false,
+		`zzz|a`:       true, // unescaped, it is an OR
+		`a\`:          true, // a trailing backslash is ignored
+		`\,`:          false,
+	} {
+		if got := Parse(q).Match(has); got != want {
+			t.Errorf("Match(%q) = %v, want %v", q, got, want)
+		}
+	}
+	if got := Parse(`a\|b c`).ServerTerms(); !reflect.DeepEqual(got, []string{"a|b"}) {
+		t.Errorf("escaped terms reach the server literally: %v", got)
+	}
+}

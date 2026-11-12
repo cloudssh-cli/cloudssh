@@ -1,6 +1,9 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -93,7 +96,7 @@ func TestEveryThemeRendersAScreenThatFits(t *testing.T) {
 	}
 }
 
-func TestBracketsGoBackAndForwardAndBracesSwitchViews(t *testing.T) {
+func TestBracketsGoBackAndForwardInAViewAndBracesThroughViews(t *testing.T) {
 	_, parent, _ := twoLevel()
 	other := fakeResource{key: "other", pages: map[string]provider.Page{"": {Rows: rows("o1")}}}
 	m := newModelWith(testCfg(), parent, other)
@@ -133,18 +136,36 @@ func TestBracketsGoBackAndForwardAndBracesSwitchViews(t *testing.T) {
 		t.Fatal("a fresh drill must clear forward")
 	}
 
-	// { and } walk dashboard, view 1, view 2 and wrap around
+	// { and } go back and forward through the views visited, like a browser
 	m, _ = send(m, key("}"))
-	if m.mode != 2 {
-		t.Fatalf("} from view 1 should open view 2, mode=%d", m.mode)
+	if m.mode != 1 || !strings.Contains(m.status, "no later view") {
+		t.Fatalf("nothing is ahead yet: mode=%d %q", m.mode, m.status)
 	}
-	m, _ = send(m, key("}"))
-	if m.mode != 0 {
-		t.Fatalf("} should wrap to the dashboard, mode=%d", m.mode)
-	}
+	m, _ = send(m, key("2"))
+	m, _ = send(m, key("d"))
 	m, _ = send(m, key("{"))
 	if m.mode != 2 {
-		t.Fatalf("{ should wrap back to the last view, mode=%d", m.mode)
+		t.Fatalf("{ should return to view 2, mode=%d", m.mode)
+	}
+	m, _ = send(m, key("{"))
+	if m.mode != 1 || len(m.stacks[1]) != 2 {
+		t.Fatalf("{ again returns to view 1, still on its drill: mode=%d depth=%d", m.mode, len(m.stacks[1]))
+	}
+	m, _ = send(m, key("{"))
+	if m.mode != 1 || !strings.Contains(m.status, "no earlier view") {
+		t.Fatalf("no wrap-around: mode=%d %q", m.mode, m.status)
+	}
+	m, _ = send(m, key("}"))
+	m, _ = send(m, key("}"))
+	if m.mode != 0 {
+		t.Fatalf("} twice reaches the dashboard again, mode=%d", m.mode)
+	}
+	m, _ = send(m, key("{"))
+	m, _ = send(m, key("3")) // out of range: ignored, keeps history
+	m, _ = send(m, key("1")) // a new move drops the forward part
+	m, _ = send(m, key("}"))
+	if m.mode != 1 || !strings.Contains(m.status, "no later view") {
+		t.Fatalf("a new move clears forward: mode=%d %q", m.mode, m.status)
 	}
 }
 
@@ -165,5 +186,57 @@ func TestFooterSaysAllLoadedAndShowsLoadingOnlyForTheFirstPage(t *testing.T) {
 	fresh := newModel(threeRows())
 	if v := fresh.View(); !strings.Contains(v, "Pages: ...") {
 		t.Fatalf("the first page shows a loading marker:\n%s", v)
+	}
+}
+
+func TestParseThemeInheritsFromItsBase(t *testing.T) {
+	th, err := ParseTheme([]byte("base: light\ncolors:\n  border: \"#112233\"\n  Title: \"#AABBCC\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if th.Border != "#112233" || th.Title != "#AABBCC" || th.Muted != themes["light"].Muted {
+		t.Fatalf("overrides on top of light: %+v", th)
+	}
+	d, err := ParseTheme([]byte("colors: {ok: \"#00ff00\"}"))
+	if err != nil || d.Border != themes["dark"].Border || d.OK != "#00ff00" {
+		t.Fatalf("base defaults to dark: %+v %v", d, err)
+	}
+	for _, bad := range []string{"colors: {border: red}", "colors: {borderr: \"#000000\"}", "base: neon", "colors: {border: \"#12\"}", ": : :"} {
+		if _, err := ParseTheme([]byte(bad)); err == nil {
+			t.Errorf("%q should be rejected", bad)
+		}
+	}
+}
+
+func TestLoadThemesFromADirectory(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("Nord.yaml", "colors: {border: \"#88C0D0\"}")
+	write("broken.yml", "colors: {border: nope}")
+	write("notes.txt", "ignored")
+	write("auto.yaml", "colors: {border: \"#000000\"}") // "auto" is reserved
+	t.Cleanup(func() { delete(themes, "nord"); delete(themeProblems, "broken") })
+
+	got := LoadThemes(dir)
+	if len(got) != 1 || got[0] != "nord" {
+		t.Fatalf("loaded %v", got)
+	}
+	if LoadThemes(filepath.Join(dir, "missing")) != nil {
+		t.Fatal("a missing directory is not an error")
+	}
+	if !slices.Contains(ThemeNames(), "nord") {
+		t.Fatal("the new theme should be listed")
+	}
+	withTheme(t, "nord")
+	if colFg != lipgloss.Color("#88C0D0") {
+		t.Fatalf("custom colour not applied: %v", colFg)
+	}
+	err := SetTheme("broken")
+	if err == nil || !strings.Contains(err.Error(), "broken.yml") || !strings.Contains(err.Error(), "#rrggbb") {
+		t.Fatalf("choosing a broken theme should say why: %v", err)
 	}
 }

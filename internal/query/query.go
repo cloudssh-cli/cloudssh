@@ -15,6 +15,10 @@
 // ANDed. Inside one piece, & binds tighter than |. Spaces next to an operator
 // ("web | api") do not count as separators.
 //
+// A backslash makes the next character an ordinary one: \| \& \( \) \, \!
+// and "\ " (an escaped space) are text, and \\ is one backslash. So "a\ b"
+// looks for the text "a b", and "\!x" for "!x".
+//
 // A query with no usable term matches everything. Parsing never fails: while
 // someone is still typing, a missing ")" is closed at the end, a stray ")" or
 // operator is ignored.
@@ -46,36 +50,56 @@ func Parse(s string) Expr {
 	return Expr{root: p.parseSeq(0)}
 }
 
-// tokenize splits s into terms and the operators ( ) | & !. A comma is "|",
-// whitespace separates (and means AND). "!" only counts at the start of a term.
-func tokenize(s string) []string {
-	var toks []string
+// tok is a term (op 0) or an operator: one of ( ) | & ! or a space.
+type tok struct {
+	op   byte
+	text string
+}
+
+const space = ' '
+
+// tokenize splits s into terms and operators. A comma is "|", whitespace
+// separates, "!" only counts at the start of a term, and a backslash makes the
+// next character plain text.
+func tokenize(s string) []tok {
+	var toks []tok
 	var cur strings.Builder
+	has := false // a term is being built (it may be empty only through escapes, which still count)
 	flush := func() {
-		if cur.Len() > 0 {
-			toks = append(toks, cur.String())
+		if has {
+			toks = append(toks, tok{text: cur.String()})
 			cur.Reset()
+			has = false
 		}
 	}
-	for _, r := range s {
+	rs := []rune(s)
+	for i := 0; i < len(rs); i++ {
+		r := rs[i]
 		switch r {
+		case '\\':
+			if i+1 < len(rs) {
+				i++
+				cur.WriteRune(rs[i])
+				has = true
+			} // a trailing backslash has nothing to escape
 		case ' ', '\t':
 			flush()
-			toks = append(toks, " ")
+			toks = append(toks, tok{op: space})
 		case '(', ')', '|', '&':
 			flush()
-			toks = append(toks, string(r))
+			toks = append(toks, tok{op: byte(r)})
 		case ',':
 			flush()
-			toks = append(toks, "|")
+			toks = append(toks, tok{op: '|'})
 		case '!':
-			if cur.Len() == 0 {
-				toks = append(toks, "!")
-			} else {
+			if has {
 				cur.WriteRune(r)
+			} else {
+				toks = append(toks, tok{op: '!'})
 			}
 		default:
 			cur.WriteRune(r)
+			has = true
 		}
 	}
 	flush()
@@ -83,27 +107,30 @@ func tokenize(s string) []string {
 }
 
 type parser struct {
-	in  []string
+	in  []tok
 	pos int
 }
 
-func (p *parser) peek() string {
+// peek is the operator at the cursor: 0 for a term or the end.
+func (p *parser) peek() byte {
 	if p.pos < len(p.in) {
-		return p.in[p.pos]
+		return p.in[p.pos].op
 	}
-	return ""
+	return 0
 }
+
+func (p *parser) atEnd() bool { return p.pos >= len(p.in) }
 
 // squeeze drops spaces that only sit next to an operator or a bracket, so
 // "web | api" and "( web )" read like "web|api" and "(web)". The spaces left
 // separate whole conditions.
-func squeeze(in []string) []string {
-	opens := func(t string) bool { return t == "|" || t == "&" || t == "(" || t == "!" }
-	closes := func(t string) bool { return t == "|" || t == "&" || t == ")" }
-	var out []string
+func squeeze(in []tok) []tok {
+	opens := func(t tok) bool { return t.op == '|' || t.op == '&' || t.op == '(' || t.op == '!' }
+	closes := func(t tok) bool { return t.op == '|' || t.op == '&' || t.op == ')' }
+	var out []tok
 	for i, t := range in {
-		if t == " " {
-			if len(out) == 0 || opens(out[len(out)-1]) || i+1 >= len(in) || closes(in[i+1]) || in[i+1] == " " {
+		if t.op == space {
+			if len(out) == 0 || opens(out[len(out)-1]) || i+1 >= len(in) || closes(in[i+1]) || in[i+1].op == space {
 				continue
 			}
 		}
@@ -115,12 +142,12 @@ func squeeze(in []string) []string {
 // parseSeq: space-separated conditions, ANDed. Stops at ")" inside brackets.
 func (p *parser) parseSeq(depth int) *node {
 	var parts []*node
-	for p.pos < len(p.in) {
+	for !p.atEnd() {
 		switch p.peek() {
-		case " ":
+		case space:
 			p.pos++
 			continue
-		case ")":
+		case ')':
 			if depth > 0 {
 				return join(kAnd, parts)
 			}
@@ -141,7 +168,7 @@ func (p *parser) parseOr(depth int) *node {
 		if n := p.parseTight(depth); n != nil {
 			alts = append(alts, n)
 		}
-		if p.peek() != "|" {
+		if p.peek() != '|' {
 			break
 		}
 		p.pos++
@@ -156,7 +183,7 @@ func (p *parser) parseTight(depth int) *node {
 		if n := p.parseUnary(depth); n != nil {
 			parts = append(parts, n)
 		}
-		if p.peek() != "&" {
+		if p.peek() != '&' {
 			break
 		}
 		p.pos++
@@ -165,26 +192,29 @@ func (p *parser) parseTight(depth int) *node {
 }
 
 func (p *parser) parseUnary(depth int) *node {
-	switch t := p.peek(); t {
-	case "", " ", "|", "&", ")":
+	if p.atEnd() {
+		return nil
+	}
+	switch p.peek() {
+	case space, '|', '&', ')':
 		return nil // nothing here; the caller deals with the token
-	case "!":
+	case '!':
 		p.pos++
 		if n := p.parseUnary(depth); n != nil {
 			return &node{kind: kNot, kids: []*node{n}}
 		}
 		return nil
-	case "(":
+	case '(':
 		p.pos++
 		n := p.parseSeq(depth + 1)
-		if p.peek() == ")" {
+		if p.peek() == ')' {
 			p.pos++
 		}
 		return n
-	default:
-		p.pos++
-		return &node{kind: kTerm, term: t}
 	}
+	t := p.in[p.pos]
+	p.pos++
+	return &node{kind: kTerm, term: t.text}
 }
 
 // join builds an and/or node, dropping the wrapper for 0 or 1 children.

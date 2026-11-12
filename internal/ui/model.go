@@ -89,6 +89,8 @@ type Model struct {
 	resources []provider.Resource
 	stacks    [][]*screen
 	forward   [][]*screen // per mode: screens left with [ that ] can bring back
+	views     []int       // views visited, oldest first; { and } walk it like browser back/forward
+	viewPos   int
 	mode      int
 	nextID    int
 
@@ -250,6 +252,41 @@ func (m *Model) switchMode(i int) tea.Cmd {
 	if i < 0 || i > len(m.resources) || i == m.mode || m.authErr != nil {
 		return nil // the profiles screen has its own key (p); nothing opens while signed out
 	}
+	m.noteView(i)
+	return m.enterMode(i)
+}
+
+// noteView records a deliberate move to view i. Anything "forward" of the
+// current position is dropped, as in a browser.
+func (m *Model) noteView(i int) {
+	if len(m.views) == 0 || m.views[m.viewPos] != m.mode {
+		m.views = append(m.views[:min(m.viewPos+1, len(m.views))], m.mode)
+		m.viewPos = len(m.views) - 1
+	}
+	m.views = append(m.views[:m.viewPos+1], i)
+	m.viewPos++
+}
+
+// stepView walks the visited views: d=-1 back, +1 forward.
+func (m *Model) stepView(d int) tea.Cmd {
+	if m.authErr != nil || m.mode > len(m.resources) {
+		return nil
+	}
+	if len(m.views) == 0 || m.views[m.viewPos] != m.mode { // not where the list thinks: start it here
+		m.views, m.viewPos = []int{m.mode}, 0
+	}
+	np := m.viewPos + d
+	if np < 0 || np >= len(m.views) {
+		if d < 0 {
+			return m.setStatus("no earlier view")
+		}
+		return m.setStatus("no later view")
+	}
+	m.viewPos = np
+	return m.enterMode(m.views[np])
+}
+
+func (m *Model) enterMode(i int) tea.Cmd {
 	m.mode = i
 	m.filtering = false
 	m.layout()
@@ -665,12 +702,8 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch k {
-	case "{", "}": // previous / next view, wrapping around
-		if m.authErr != nil || m.mode > len(m.resources) {
-			return m, nil
-		}
-		n := len(m.resources) + 1
-		cmd := m.switchMode((m.mode + n + map[string]int{"{": -1, "}": 1}[k]) % n)
+	case "{", "}": // back / forward through the views visited
+		cmd := m.stepView(map[string]int{"{": -1, "}": 1}[k])
 		return m, cmd
 	case "[":
 		if len(m.stacks[m.mode]) < 2 {
