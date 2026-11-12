@@ -10,6 +10,7 @@ import (
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/config"
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/SVMadhavaReddy/cloudssh/internal/sshx"
 )
 
 type recorder struct {
@@ -106,7 +107,9 @@ func sized(m Model, w, h int) Model {
 }
 
 func newModelWith(cfg config.Config, res ...provider.Resource) Model {
-	return sized(New(cfg, fakeProvider{res}), 120, 30)
+	m := New(cfg, fakeProvider{res})
+	m.detectTunnels = func(context.Context) []sshx.LocalTunnel { return nil } // never scan real processes in tests
+	return sized(m, 120, 30)
 }
 
 func newModel(res fakeResource) Model { return newModelWith(testCfg(), res) }

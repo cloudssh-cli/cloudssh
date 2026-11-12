@@ -43,8 +43,9 @@ type drilledMsg struct {
 }
 
 type resolvedMsg struct {
-	host provider.Host
-	err  error
+	host    provider.Host
+	tunnels []sshx.LocalTunnel // already-running tunnels that lead to host
+	err     error
 }
 
 // eicMsg is the result of pushing a temporary key (EC2 Instance Connect):
@@ -77,9 +78,11 @@ type Model struct {
 	history   []string
 	histPos   int
 
-	modal     modal
-	splashing bool
-	splashAt  int
+	modal modal
+	// detectTunnels lists tunnels the user already runs (replaceable in tests).
+	detectTunnels func(context.Context) []sshx.LocalTunnel
+	splashing     bool
+	splashAt      int
 
 	status    string
 	statusSeq int
@@ -93,7 +96,7 @@ func New(cfg config.Config, p provider.Provider) Model {
 	f.Placeholder = "Enter your search string here..."
 	m := Model{
 		cfg: cfg, prov: p, resources: p.Resources(), filter: f,
-		splashing: !cfg.SkipSplash, nextID: 1,
+		splashing: !cfg.SkipSplash, nextID: 1, detectTunnels: sshx.DetectTunnels,
 	}
 	m.stacks = make([][]*screen, len(m.resources)+1)
 	m.mode = m.startMode()
@@ -286,7 +289,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.setStatus("error: host has no reachable IP address")
 		}
 		auth, _ := m.prov.(provider.Authorizer)
-		sm, cmd := newSSHModal(msg.host, m.cfg, auth)
+		sm, cmd := newSSHModal(msg.host, m.cfg, auth, msg.tunnels)
 		m.modal = sm
 		return m, cmd
 
@@ -503,12 +506,21 @@ func (m Model) connect(s *screen) (tea.Model, tea.Cmd) {
 	}
 	statusCmd := m.setStatus("resolving ssh user...")
 	resolver, _ := m.prov.(provider.HostResolver)
+	detect := m.detectTunnels
 	return m, tea.Batch(statusCmd, func() tea.Msg {
-		if resolver == nil {
-			return resolvedMsg{host: host}
+		ctx := context.Background()
+		h := host
+		if resolver != nil {
+			var err error
+			if h, err = resolver.ResolveHost(ctx, host); err != nil {
+				return resolvedMsg{host: h, err: err}
+			}
 		}
-		h, err := resolver.ResolveHost(context.Background(), host)
-		return resolvedMsg{host: h, err: err}
+		var tunnels []sshx.LocalTunnel
+		if detect != nil {
+			tunnels = sshx.TunnelsFor(detect(ctx), h)
+		}
+		return resolvedMsg{host: h, tunnels: tunnels}
 	})
 }
 

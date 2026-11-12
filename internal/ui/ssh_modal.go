@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,9 +29,12 @@ type sshModal struct {
 
 	auth    provider.Authorizer // nil when the provider has no temporary-key service
 	viaAuth bool                // connect with a temporary key pushed through auth
+
+	tunnels   []sshx.LocalTunnel // tunnels the user already runs that lead to this host
+	viaTunnel bool               // connect through tunnels[0] instead of directly
 }
 
-func newSSHModal(h provider.Host, cfg config.Config, auth provider.Authorizer) (*sshModal, tea.Cmd) {
+func newSSHModal(h provider.Host, cfg config.Config, auth provider.Authorizer, tunnels []sshx.LocalTunnel) (*sshModal, tea.Cmd) {
 	in := textinput.New()
 	in.Prompt = ""
 	in.Width = 30
@@ -46,6 +50,7 @@ func newSSHModal(h provider.Host, cfg config.Config, auth provider.Authorizer) (
 		pemDir:  config.ExpandHome(cfg.PemFilesPath),
 		auth:    auth,
 		viaAuth: auth != nil && cfg.SSHMethod == "instance-connect",
+		tunnels: tunnels,
 	}
 	switch {
 	case sm.both:
@@ -65,9 +70,26 @@ func (sm *sshModal) pref() string {
 
 func (sm *sshModal) username() string { return strings.TrimSpace(sm.user.Value()) }
 
+// withTunnel points t at the running tunnel when the user chose it. The host
+// key is stored under the instance, not under 127.0.0.1:<port>, so known_hosts
+// stays valid across tunnels on different ports.
+func (sm *sshModal) withTunnel(t sshx.Target) sshx.Target {
+	if !sm.viaTunnel || len(sm.tunnels) == 0 {
+		return t
+	}
+	alias := sm.host.ID
+	if alias == "" {
+		alias = sm.host.PrivateIP
+	}
+	t.Address, t.Port = "127.0.0.1", sm.tunnels[0].Port
+	t.Options = append(t.Options, "HostKeyAlias="+alias, "ServerAliveInterval=5")
+	return t
+}
+
 // target resolves the address, and the key file for the plain ssh method.
 func (sm *sshModal) target() (sshx.Target, error) {
-	return sshx.Resolve(sm.host, sm.username(), sm.pref(), sm.pemDir)
+	t, err := sshx.Resolve(sm.host, sm.username(), sm.pref(), sm.pemDir)
+	return sm.withTunnel(t), err
 }
 
 func (sm *sshModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
@@ -82,6 +104,11 @@ func (sm *sshModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 	case "ctrl+t":
 		if sm.auth != nil {
 			sm.viaAuth = !sm.viaAuth
+		}
+		return false, nil
+	case "ctrl+o":
+		if len(sm.tunnels) > 0 {
+			sm.viaTunnel = !sm.viaTunnel
 		}
 		return false, nil
 	case "enter":
@@ -104,6 +131,7 @@ func (sm *sshModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 // returns the target to connect with.
 func (sm *sshModal) authorize() tea.Cmd {
 	host, user, pref, auth := sm.host, sm.username(), sm.pref(), sm.auth
+	snapshot := *sm // withTunnel reads the toggles; the dialog is gone by the time this runs
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), authTimeout)
 		defer cancel()
@@ -120,8 +148,16 @@ func (sm *sshModal) authorize() tea.Cmd {
 			return eicMsg{key: key, err: err}
 		}
 		t.KeyFile, t.OnlyKey = key.Path, true
-		return eicMsg{target: t, key: key}
+		return eicMsg{target: snapshot.withTunnel(t), key: key}
 	}
+}
+
+// addr is the address a direct connection would use, for display.
+func (sm *sshModal) addr() string {
+	if sm.public {
+		return sm.host.PublicIP
+	}
+	return sm.host.PrivateIP
 }
 
 func radio(on bool, label, detail string) string {
@@ -141,7 +177,7 @@ func (sm *sshModal) preview() string {
 			return errorStyle.Render(err.Error())
 		}
 		t.KeyFile, t.OnlyKey = "<temporary key>", true
-		return statusStyle.Render("ssh " + strings.Join(t.Args(), " "))
+		return statusStyle.Render("ssh " + strings.Join(sm.withTunnel(t).Args(), " "))
 	}
 	t, err := sm.target()
 	if err != nil {
@@ -161,12 +197,20 @@ func (sm *sshModal) view(w, h int) string {
 		body = append(body, label.Render(" Connect using:"),
 			" "+radio(!sm.viaAuth, "SSH key", "your keys / agent")+"   "+radio(sm.viaAuth, sm.auth.AuthLabel(), "temporary key"), "")
 	}
+	if len(sm.tunnels) > 0 {
+		tun := sm.tunnels[0]
+		body = append(body, label.Render(" Connect via:"),
+			" "+radio(!sm.viaTunnel, "Direct", sm.addr())+"   "+radio(sm.viaTunnel, "Running tunnel", "127.0.0.1:"+strconv.Itoa(tun.Port)), "")
+	}
 	hints := "enter connect · esc cancel"
 	if sm.both {
 		hints += " · tab switch IP"
 	}
 	if sm.auth != nil {
 		hints += " · ctrl+t switch method"
+	}
+	if len(sm.tunnels) > 0 {
+		hints += " · ctrl+o use tunnel"
 	}
 	body = append(body, label.Render(" Final ssh command preview:"), " "+sm.preview(), "", hintDescStyle.Render(" "+hints))
 	bw := 0

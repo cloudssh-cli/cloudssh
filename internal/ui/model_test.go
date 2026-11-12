@@ -12,6 +12,7 @@ import (
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/config"
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/SVMadhavaReddy/cloudssh/internal/sshx"
 )
 
 func TestInitLoadsFirstPage(t *testing.T) {
@@ -408,5 +409,100 @@ func TestInstanceConnectFailureCleansUpAndReports(t *testing.T) {
 	}
 	if _, err := os.Stat(res.key.Dir); !os.IsNotExist(err) {
 		t.Fatal("temporary key must be deleted when authorisation fails")
+	}
+}
+
+func tunnelHost() provider.Host {
+	return provider.Host{ID: "i-1", Name: "web", PrivateIP: "10.0.0.1", DefaultUser: "ubuntu"}
+}
+
+func TestConnectOffersOnlyTunnelsThatLeadToTheHost(t *testing.T) {
+	m := loaded(t, fakeResource{pages: map[string]provider.Page{"": {Rows: []provider.Row{
+		{Cells: []string{"i-1", "web"}, Ref: tunnelHost()},
+	}}}})
+	m.detectTunnels = func(context.Context) []sshx.LocalTunnel {
+		return []sshx.LocalTunnel{
+			{Port: 2222, RemotePort: 22, InstanceID: "i-1"},
+			{Port: 2223, RemotePort: 22, InstanceID: "i-other"},
+			{Port: 3306, RemotePort: 3306, InstanceID: "i-1"},
+		}
+	}
+	_, cmd := send(m, key("S"))
+	var got resolvedMsg
+	for _, msg := range run(cmd) {
+		if r, ok := msg.(resolvedMsg); ok {
+			got = r
+		}
+	}
+	if len(got.tunnels) != 1 || got.tunnels[0].Port != 2222 {
+		t.Fatalf("tunnels: %+v", got.tunnels)
+	}
+}
+
+func TestSSHDialogOffersRunningTunnel(t *testing.T) {
+	m := loaded(t, threeRows())
+	m, _ = send(m, resolvedMsg{host: tunnelHost(), tunnels: []sshx.LocalTunnel{{Port: 2222, RemotePort: 22, InstanceID: "i-1"}}})
+	v := m.View()
+	for _, want := range []string{"Connect via:", "Running tunnel", "127.0.0.1:2222", "ctrl+o use tunnel", "ssh ubuntu@10.0.0.1"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("dialog missing %q", want)
+		}
+	}
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlO})
+	v = m.View()
+	for _, want := range []string{"-p 2222", "HostKeyAlias=i-1", "ServerAliveInterval=5", "ubuntu@127.0.0.1"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("tunnel preview missing %q:\n%s", want, v)
+		}
+	}
+	m, cmd := send(m, key("enter"))
+	if cmd == nil || m.modal != nil {
+		t.Fatalf("enter should start ssh through the tunnel (cmd=%v modal=%v)", cmd, m.modal)
+	}
+}
+
+func TestTunnelOptionHiddenAndInertWithoutAMatchingTunnel(t *testing.T) {
+	m := loaded(t, threeRows())
+	m, _ = send(m, resolvedMsg{host: tunnelHost()})
+	if strings.Contains(m.View(), "Connect via") || strings.Contains(m.View(), "ctrl+o") {
+		t.Fatal("no tunnel option without a running tunnel")
+	}
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlO})
+	if m.modal == nil || m.modal.(*sshModal).viaTunnel {
+		t.Fatal("ctrl+o must be inert")
+	}
+}
+
+func TestTunnelCombinesWithTemporaryKey(t *testing.T) {
+	if _, err := exec.LookPath("ssh-keygen"); err != nil {
+		t.Skip("ssh-keygen not installed")
+	}
+	auth := &fakeAuthProvider{}
+	m := authModel(t, testCfg(), auth)
+	m, _ = send(m, resolvedMsg{
+		host:    provider.Host{ID: "i-1", AZ: "us-east-1a", PrivateIP: "10.0.0.1", DefaultUser: "ubuntu"},
+		tunnels: []sshx.LocalTunnel{{Port: 2222, RemotePort: 22, InstanceID: "i-1"}},
+	})
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlT})
+	m, _ = send(m, tea.KeyMsg{Type: tea.KeyCtrlO})
+	_, cmd := send(m, key("enter"))
+	var ready eicMsg
+	for _, msg := range run(cmd) {
+		if e, ok := msg.(eicMsg); ok {
+			ready = e
+		}
+	}
+	defer ready.key.Cleanup()
+	if ready.err != nil {
+		t.Fatal(ready.err)
+	}
+	args := strings.Join(ready.target.Args(), " ")
+	for _, want := range []string{"-p 2222", "HostKeyAlias=i-1", "IdentitiesOnly=yes", "ubuntu@127.0.0.1"} {
+		if !strings.Contains(args, want) {
+			t.Errorf("args %q missing %q", args, want)
+		}
+	}
+	if auth.got.ID != "i-1" {
+		t.Fatal("the temporary key must still be pushed to the instance")
 	}
 }
