@@ -5,3 +5,4 @@ coverage.out
 /pems/
 .env
 .DS_Store
+local.mk

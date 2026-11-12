@@ -9,7 +9,7 @@ SSH is the real `ssh` binary: cloudssh suspends its UI, hands your terminal to `
 Not distributed yet. Build and run from source via Docker:
 
 ```sh
-make build   # ./bin/cloudssh (linux)
+make build   # ./bin/cloudssh; linux by default, see "Build target" below
 make run     # run the TUI in a container
 ```
 
@@ -78,6 +78,16 @@ make check   # fmt + vet + lint + tests
 make run     # run the TUI in a container (mounts ~/.aws and ~/.ssh read-only)
 make help
 ```
+
+### Build target
+
+`make build` cross-compiles inside the container. With nothing configured it builds for the container's platform (linux). To always build for your own machine, set the target once, either in your shell profile:
+
+```sh
+export CLOUDSSH_BUILD_GOOS=darwin CLOUDSSH_BUILD_GOARCH=arm64
+```
+
+or in a gitignored `local.mk` at the repo root (`CLOUDSSH_BUILD_GOOS ?= darwin` / `CLOUDSSH_BUILD_GOARCH ?= arm64`). Variables set in the environment win over `local.mk`. They are intentionally not `GOOS`/`GOARCH`, which would also affect `make test` and `make lint`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 

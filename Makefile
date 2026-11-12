@@ -20,8 +20,16 @@ cover: ## coverage report (coverage.out)
 	$(RUN) go test -race -coverprofile=coverage.out ./...
 vuln: ## govulncheck
 	$(RUN) govulncheck ./...
-build: ## build ./bin/cloudssh (linux, inside container)
-	$(RUN) go build -trimpath -o bin/cloudssh ./cmd/cloudssh
+# `make build` target platform. Unset = the container's own platform (linux).
+# Configure your machine once instead of editing this file, either way:
+#   export CLOUDSSH_BUILD_GOOS=darwin CLOUDSSH_BUILD_GOARCH=arm64   # shell profile
+#   or a gitignored local.mk containing:
+#   CLOUDSSH_BUILD_GOOS ?= darwin
+#   CLOUDSSH_BUILD_GOARCH ?= arm64
+# These are deliberately not GOOS/GOARCH: those would leak into test/vet/lint.
+-include local.mk
+build: ## build ./bin/cloudssh (platform from CLOUDSSH_BUILD_GOOS/GOARCH, default linux)
+	$(RUN) env CGO_ENABLED=0 $(if $(CLOUDSSH_BUILD_GOOS),GOOS=$(CLOUDSSH_BUILD_GOOS)) $(if $(CLOUDSSH_BUILD_GOARCH),GOARCH=$(CLOUDSSH_BUILD_GOARCH)) go build -trimpath -ldflags "-s -w" -o bin/cloudssh ./cmd/cloudssh
 run: ## run the TUI in a container (uses ~/.aws, ~/.ssh)
 	docker compose run --rm --build app
 check: fmt vet lint test ## everything CI runs
