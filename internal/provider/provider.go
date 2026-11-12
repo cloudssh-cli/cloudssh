@@ -1,5 +1,20 @@
 // Package provider defines the cloud-agnostic contracts the UI depends on.
-// Each cloud (aws, later azure/gcp) implements Provider in its own subpackage.
+// Each cloud lives in its own subpackage (provider/aws, ...), implements these
+// interfaces and registers a factory with internal/cloud; the UI and CLI never
+// import a cloud directly.
+//
+// Required: Provider (name + top-level Resources) and Resource.
+//
+// Optional capabilities, discovered by type assertion. Implement only what the
+// cloud can do; the UI adapts:
+//
+//	Drillable      a row opens a child resource (e.g. group -> machines)
+//	HostResolver   enrich a Host just before ssh (e.g. default user from the image)
+//	Authenticator  sign-in state, profile list and switching, "how am I signed in"
+//	Authorizer     a short-lived key service (AWS: EC2 Instance Connect)
+//	Demoer         the provider runs on built-in sample data (cloudssh --demo)
+//
+// providertest.Conformance checks a provider against this contract.
 package provider
 
 import "context"
@@ -45,9 +60,9 @@ type Query struct {
 	Filters []Filter
 }
 
-// Resource is a browsable resource type (EC2 instances, ECS clusters, ...).
+// Resource is a browsable resource type (virtual machines, clusters, networks, ...).
 type Resource interface {
-	// Key is the short mode id ("ec2"); Label the dashboard label ("EC2 Instances").
+	// Key is the short, unique mode id ("vm"); Label the dashboard label ("Virtual Machines").
 	Key() string
 	Label() string
 	// Name is the table title; Crumb the breadcrumb segment.
@@ -69,7 +84,7 @@ type Drill struct {
 }
 
 // Drillable is implemented by resources whose rows open another resource.
-// It may call the cloud API (e.g. resolve an ECS task to its EC2 instance),
+// It may call the cloud API (e.g. resolve a container task to its host machine),
 // so the UI runs it off the update loop. Returning an error shows it to the user.
 type Drillable interface {
 	// DrillHint describes the action for the key-hint header, e.g. "Subnets View".
@@ -92,7 +107,7 @@ type Host struct {
 	PublicIP  string
 	KeyName   string
 	ImageID   string
-	AZ        string // needed by short-lived key services such as EC2 Instance Connect
+	AZ        string // zone; needed by some short-lived key services
 	// DefaultUser is a best-effort guess derived from the image, may be empty.
 	DefaultUser string
 }
@@ -104,10 +119,10 @@ type HostResolver interface {
 }
 
 // Authorizer is optionally implemented by a Provider that can grant
-// short-lived SSH access without a pre-shared key (AWS EC2 Instance Connect):
+// short-lived SSH access without a pre-shared key (e.g. AWS EC2 Instance Connect):
 // it installs publicKey for user on the host for a short time.
 type Authorizer interface {
-	// AuthLabel names the mechanism in the UI, e.g. "EC2 Instance Connect".
+	// AuthLabel names the mechanism in the UI, e.g. "EC2 Instance Connect" on AWS.
 	AuthLabel() string
 	AuthorizeSSH(ctx context.Context, h Host, user, publicKey string) error
 }
@@ -127,8 +142,7 @@ type Authenticator interface {
 	// AuthError is nil when ready. Otherwise it is a friendly explanation:
 	// the first line is a headline, the rest is guidance.
 	AuthError() error
-	// Access says how the app is signed in, for the header: "profile prod · SSO",
-	// "environment keys", "instance role", ...
+	// Access says how the app is signed in, for the header, e.g. "profile prod · SSO".
 	Access() string
 	// Region is the region in use, if known.
 	Region() string
@@ -140,4 +154,16 @@ type Authenticator interface {
 	// returns the same friendly error AuthError would. Calling it with the
 	// current profile retries, e.g. after the user logged in elsewhere.
 	UseProfile(ctx context.Context, profile string) error
+}
+
+// Demoer is implemented by providers running on built-in sample data
+// (cloudssh --demo). The UI marks the session and never starts real ssh.
+type Demoer interface{ Demo() bool }
+
+// Options is what the CLI hands a cloud's factory (see internal/cloud).
+type Options struct {
+	Profile  string // sign-in profile ("" = the cloud's default chain)
+	Region   string
+	PageSize int32
+	Demo     bool // run on built-in sample data instead of a real account
 }
