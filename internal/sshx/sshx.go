@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
@@ -19,11 +20,21 @@ type Target struct {
 	// OnlyKey makes ssh offer just KeyFile (IdentitiesOnly), needed for
 	// short-lived keys so agent keys don't exhaust the server's auth attempts.
 	OnlyKey bool
+	// Port and Options are for tunnelled connections (local forwarded port,
+	// HostKeyAlias, ServerAliveInterval, ...).
+	Port    int
+	Options []string
 }
 
 // Args returns the argument vector for ssh (without the binary name).
 func (t Target) Args() []string {
 	var args []string
+	if t.Port > 0 {
+		args = append(args, "-p", strconv.Itoa(t.Port))
+	}
+	for _, o := range t.Options {
+		args = append(args, "-o", o)
+	}
 	if t.KeyFile != "" {
 		args = append(args, "-i", t.KeyFile)
 		if t.OnlyKey {

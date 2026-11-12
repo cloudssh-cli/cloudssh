@@ -86,3 +86,14 @@ func TestNewTempKeyGeneratesAndCleansUp(t *testing.T) {
 		t.Fatal("cleanup should remove the key directory")
 	}
 }
+
+func TestArgsTunnelPortAndOptions(t *testing.T) {
+	got := strings.Join(Target{
+		User: "ubuntu", Address: "127.0.0.1", Port: 4242, KeyFile: "/k", OnlyKey: true,
+		Options: []string{"HostKeyAlias=i-1", "ServerAliveInterval=5"},
+	}.Args(), " ")
+	want := "-p 4242 -o HostKeyAlias=i-1 -o ServerAliveInterval=5 -i /k -o IdentitiesOnly=yes ubuntu@127.0.0.1"
+	if got != want {
+		t.Fatalf("args:\n got %s\nwant %s", got, want)
+	}
+}
