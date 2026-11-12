@@ -24,7 +24,7 @@ func nameTag(tags []types.Tag) string {
 
 type vpcs struct{ p *Provider }
 
-type vpcRef struct{ ID string }
+type vpcRef struct{ ID, Name string }
 
 func (vpcs) Key() string                       { return "vpc" }
 func (vpcs) Label() string                     { return "Virtual Private Clouds" }
@@ -74,7 +74,7 @@ func vpcRow(v types.Vpc) provider.Row {
 	id := awssdk.ToString(v.VpcId)
 	return provider.Row{
 		Cells: []string{nameTag(v.Tags), id, awssdk.ToString(v.CidrBlock), yesNo(awssdk.ToBool(v.IsDefault))},
-		Ref:   vpcRef{ID: id},
+		Ref:   vpcRef{ID: id, Name: nameTag(v.Tags)},
 	}
 }
 
@@ -84,7 +84,7 @@ func (r vpcs) Drill(_ context.Context, row provider.Row) (provider.Drill, error)
 		return provider.Drill{}, fmt.Errorf("no vpc selected")
 	}
 	return provider.Drill{
-		Resource: &subnets{p: r.p, vpc: ref.ID},
+		Resource: &subnets{p: r.p, vpc: ref.ID, vpcName: ref.Name},
 		Filters:  []provider.Filter{{Key: "vpc-id", Value: ref.ID}},
 	}, nil
 }
@@ -92,17 +92,18 @@ func (r vpcs) Drill(_ context.Context, row provider.Row) (provider.Drill, error)
 // ---- Subnets (drill-only) ----
 
 type subnets struct {
-	p   *Provider
-	vpc string
+	p       *Provider
+	vpc     string
+	vpcName string // the VPC's Name tag, preferred over its id in titles
 }
 
-type subnetRef struct{ ID string }
+type subnetRef struct{ ID, Name string }
 
 func (subnets) Key() string   { return "subnets" }
 func (subnets) Label() string { return "Subnets" }
 func (r subnets) Name() string {
 	if r.vpc != "" {
-		return "VPC · " + r.vpc
+		return "VPC · " + firstNonEmpty(r.vpcName, r.vpc)
 	}
 	return "Subnets"
 }
@@ -148,7 +149,7 @@ func subnetRow(s types.Subnet) provider.Row {
 			nameTag(s.Tags), id, awssdk.ToString(s.VpcId), awssdk.ToString(s.AvailabilityZone),
 			awssdk.ToString(s.CidrBlock), fmt.Sprint(awssdk.ToInt32(s.AvailableIpAddressCount)),
 		},
-		Ref: subnetRef{ID: id},
+		Ref: subnetRef{ID: id, Name: nameTag(s.Tags)},
 	}
 }
 
@@ -158,7 +159,27 @@ func (r subnets) Drill(_ context.Context, row provider.Row) (provider.Drill, err
 		return provider.Drill{}, fmt.Errorf("no subnet selected")
 	}
 	return provider.Drill{
-		Resource: &instances{p: r.p, sub: "subnet " + ref.ID},
+		Resource: &instances{p: r.p, sub: subnetLabel(ref)},
 		Filters:  []provider.Filter{{Key: "subnet-id", Value: ref.ID}},
 	}, nil
+}
+
+// firstNonEmpty returns the first argument that is not empty: titles prefer a
+// resource's name over its id.
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// subnetLabel names a subnet for a title: its Name tag, else its id (which
+// already says "subnet").
+func subnetLabel(ref subnetRef) string {
+	if ref.Name != "" {
+		return "subnet " + ref.Name
+	}
+	return ref.ID
 }

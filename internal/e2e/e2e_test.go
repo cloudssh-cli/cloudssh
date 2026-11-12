@@ -218,7 +218,7 @@ func TestVPCToSubnetsToInstances(t *testing.T) {
 	m = press(m, "enter")
 	mustContain(t, m, "[8]", "prod-public-a", "prod-private-a", "prod-data-b", "Available Ips", "<vpcs>", "<subnets>")
 	m = press(m, "enter") // the subnet with the fewest free addresses has the most machines
-	mustContain(t, m, "<vpcs> <subnets> <ec2_instances>", "EC2 · subnet subnet-")
+	mustContain(t, m, "<vpcs> <subnets> <ec2_instances>", "EC2 · subnet prod-")
 }
 
 func TestECSClusterToServicesToTasksToInstance(t *testing.T) {

@@ -246,3 +246,21 @@ func TestEveryResourceHasConsistentMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestTitlesPreferNamesOverIDs(t *testing.T) {
+	if got := (subnets{vpc: "vpc-1", vpcName: "prod-main"}).Name(); got != "VPC · prod-main" {
+		t.Errorf("a named VPC shows its name: %q", got)
+	}
+	if got := (subnets{vpc: "vpc-1"}).Name(); got != "VPC · vpc-1" {
+		t.Errorf("an unnamed VPC shows its id: %q", got)
+	}
+	if got := subnetLabel(subnetRef{ID: "subnet-9", Name: "prod-public-a"}); got != "subnet prod-public-a" {
+		t.Errorf("a named subnet: %q", got)
+	}
+	if got := subnetLabel(subnetRef{ID: "subnet-9"}); got != "subnet-9" {
+		t.Errorf("an unnamed subnet must not say subnet twice: %q", got)
+	}
+	if got := (instances{sub: "ecs task 45ddf63e"}).Name(); got != "EC2 · ecs task 45ddf63e" {
+		t.Errorf("task title: %q", got)
+	}
+}

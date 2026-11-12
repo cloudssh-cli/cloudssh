@@ -324,7 +324,7 @@ func (r ecsTasks) Drill(ctx context.Context, row provider.Row) (provider.Drill, 
 	}
 	id := awssdk.ToString(out.ContainerInstances[0].Ec2InstanceId)
 	return provider.Drill{
-		Resource: &instances{p: r.p, sub: "task " + ref.TaskID},
+		Resource: &instances{p: r.p, sub: "ecs task " + ref.TaskID},
 		Filters:  []provider.Filter{{Key: "instance-id", Value: id}},
 	}, nil
 }
