@@ -492,7 +492,7 @@ func TestSplashShowsFadesAndCanBeSkipped(t *testing.T) {
 
 func TestViewHasHeaderPanelTitleAndBreadcrumbs(t *testing.T) {
 	v := loaded(t, threeRows()).View()
-	for _, want := range []string{"Cloud:", "<enter/S>", "<r>", "<?>", "Fake[3+]<all>", "<fake_fake>", "Pages: 1+", "alpha"} {
+	for _, want := range []string{"Cloud:", "<enter/S>", "<r>", "<?>", "Fake[3+]<all>", "<fake_fake>", "Press n to load more...", "alpha"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("view missing %q", want)
 		}
@@ -696,5 +696,24 @@ func TestHyphenTogglesBetweenTheTwoLatestViews(t *testing.T) {
 	m, _ = send(m, key("d"))
 	if m, _ = send(m, key("-")); m.mode != 1 {
 		t.Fatalf("- returns from the dashboard to where you were: %d", m.mode)
+	}
+}
+
+func TestHelpWrapsLongDescriptionsInsteadOfCroppingThem(t *testing.T) {
+	for _, w := range []int{40, 60, 120} {
+		v := strings.ReplaceAll(helpFixture(t, w, 60).View(), "\u00a0", " ")
+		flat := strings.Join(strings.Fields(strings.NewReplacer("│", " ").Replace(v)), " ")
+		if strings.Contains(v, "…") {
+			t.Errorf("width %d: nothing in help may be ellipsised:\n%s", w, v)
+		}
+		for _, word := range []string{"search", "and", "filters"} {
+			if !strings.Contains(flat, word) {
+				t.Errorf("width %d: help lost %q", w, word)
+			}
+		}
+	}
+	got := hangingEntry(helpEntry{"", "the same in search and in filters, which is a rather long sentence"}, 4, 30)
+	if len(got) < 2 {
+		t.Fatalf("a long description wraps: %q", got)
 	}
 }

@@ -8,7 +8,6 @@ package e2e
 import (
 	"context"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -140,22 +139,22 @@ func mustNotContain(t *testing.T, m ui.Model, nots ...string) {
 func TestDemoOpensOnRunningInstancesAndSaysItIsADemo(t *testing.T) {
 	m := demo(t)
 	mustContain(t, m, "Cloud: aws · us-east-1 · demo", "Account: cloudssh-production (123456789012)", "Auth: SSO (cloudssh-prod) · role AdministratorAccess", "aws · us-east-1",
-		"Instances[", "api-prod-1", "bastion-01", "running", "Pages: 1+", "<ec2_instances>")
+		"Instances[", "api-prod-1", "bastion-01", "running", "Press n to load more...", "<ec2_instances>")
 	mustNotContain(t, m, "postgres-replica", "old-build-agent") // stopped and terminated hide behind the default state filter
 }
 
 func TestPagingWalksEveryRunningInstance(t *testing.T) {
 	m := demo(t)
 	pages := 1
-	for strings.Contains(m.View(), "Pages: "+strconv.Itoa(pages)+"+") && pages < 20 {
+	for strings.Contains(m.View(), "to load more...") && pages < 20 {
 		m = press(m, "n")
 		pages++
 	}
 	if pages < 5 { // ~50 running instances at 8 per page
 		t.Errorf("the demo should need several pages, got %d:\n%s", pages, m.View())
 	}
-	mustContain(t, m, "Pages: "+strconv.Itoa(pages)) // the "+" is gone: nothing left to load
-	mustNotContain(t, m, "Pages: "+strconv.Itoa(pages)+"+")
+	mustContain(t, m, "all loaded") // nothing left to load
+	mustNotContain(t, m, "to load more...")
 }
 
 func TestSearchOnlySeesLoadedPagesAndSaysSo(t *testing.T) {
@@ -203,33 +202,33 @@ func TestSSHDialogUsesTheDefaultUserFromTheImageAndOffersTheTemporaryKey(t *test
 func TestAutoScalingGroupDrillsIntoItsInstances(t *testing.T) {
 	m := demo(t)
 	m = press(m, "4")
-	mustContain(t, m, "Auto Scaling Groups[6]", "batch-workers-asg", "web-prod-asg", "api-prod-asg", "ecs-prod-apps-asg", "Desired Capacity")
+	mustContain(t, m, "Auto Scaling · Groups[6]", "batch-workers-asg", "web-prod-asg", "api-prod-asg", "ecs-prod-apps-asg", "Desired Capacity")
 	m = press(typeText(press(m, "/"), "web-prod"), "enter", "enter")
-	mustContain(t, m, "Instances(web-prod-asg)[4]", "web-prod-1", "web-prod-4", "<autoscaling_groups>", "<ec2_instances>")
+	mustContain(t, m, "Instances (web-prod-asg)[4]", "web-prod-1", "web-prod-4", "<autoscaling_groups>", "<ec2_instances>")
 	mustNotContain(t, m, "api-prod-1")
 	m = press(m, "esc")
-	mustContain(t, m, "Auto Scaling Groups[")
+	mustContain(t, m, "Auto Scaling · Groups[")
 }
 
 func TestVPCToSubnetsToInstances(t *testing.T) {
 	m := demo(t)
 	m = press(m, "5")
-	mustContain(t, m, "Virtual Private Clouds[3]", "prod-main", "prod-dr", "172.31.0.0/16")
+	mustContain(t, m, "VPC · Networks[3]", "prod-main", "prod-dr", "172.31.0.0/16")
 	m = press(typeText(press(m, "/"), "prod-main"), "enter")
 	m = press(m, "enter")
-	mustContain(t, m, "Subnets[8]", "prod-public-a", "prod-private-a", "prod-data-b", "Available Ips", "<vpcs>", "<subnets>")
+	mustContain(t, m, "[8]", "prod-public-a", "prod-private-a", "prod-data-b", "Available Ips", "<vpcs>", "<subnets>")
 	m = press(m, "enter") // the subnet with the fewest free addresses has the most machines
-	mustContain(t, m, "<vpcs> <subnets> <ec2_instances>", "Instances[")
+	mustContain(t, m, "<vpcs> <subnets> <ec2_instances>", "Instances (subnet-")
 }
 
 func TestECSClusterToServicesToTasksToInstance(t *testing.T) {
 	m := demo(t)
 	m = press(m, "2")
-	mustContain(t, m, "ECS Clusters[3]", "prod-apps", "prod-fargate", "batch")
+	mustContain(t, m, "ECS · Clusters[3]", "prod-apps", "prod-fargate", "batch")
 	m = press(m, "enter") // prod-apps runs the most tasks
-	mustContain(t, m, "prod-apps[5]", "api", "worker", "log-agent", "scheduler", "migrations", "3 running / 3 desired", "<ecs_clusters> <services>")
+	mustContain(t, m, "ECS - prod-apps[5]", "api", "worker", "log-agent", "scheduler", "migrations", "3 running / 3 desired", "<ecs_clusters> <services>")
 	m = press(m, "enter") // api
-	mustContain(t, m, "api(prod-apps)[3]", "RUNNING/RUNNING", "1", "2 GB", "<tasks>")
+	mustContain(t, m, "api (prod-apps)[3]", "RUNNING/RUNNING", "1", "2 GB", "<tasks>")
 	m = press(m, "enter") // an EC2-launched task resolves to its container instance
 	mustContain(t, m, "<ecs_clusters> <services> <tasks> <ec2_instances>", "ecs-prod-apps-")
 }
@@ -249,9 +248,9 @@ func TestDrillGuardsExplainThemselvesInsteadOfFailing(t *testing.T) {
 func TestEKSClusterToNodeGroupsToNodes(t *testing.T) {
 	m := demo(t)
 	m = press(m, "3")
-	mustContain(t, m, "EKS Clusters[3]", "data-platform", "legacy-eks", "prod-eks", "1.30", "UPDATING")
+	mustContain(t, m, "EKS · Clusters[3]", "data-platform", "legacy-eks", "prod-eks", "1.30", "UPDATING")
 	m = press(m, "j", "j", "enter") // prod-eks
-	mustContain(t, m, "prod-eks[2]", "general", "spot", "1.30.2-20240729", "3/6", "<eks_clusters> <node_groups>")
+	mustContain(t, m, "EKS - prod-eks[2]", "general", "spot", "1.30.2-20240729", "3/6", "<eks_clusters> <node_groups>")
 	m = press(m, "enter") // general
 	mustContain(t, m, "prod-eks-general-node", "<node_groups> <ec2_instances>")
 }
@@ -307,10 +306,10 @@ func TestEveryDemoScreenFitsTheTerminal(t *testing.T) {
 // With the default demo page size the 100+ sample machines span five pages.
 func TestDemoHasOverAHundredMachinesInFivePagesOfTwentyFive(t *testing.T) {
 	m := start(t, aws.NewDemo(25), 150, 40)
-	mustContain(t, m, "Pages: 1+")
+	mustContain(t, m, "Press n to load more...")
 	m = press(m, "n", "n", "n", "n")
-	mustContain(t, m, "Pages: 5")
-	mustNotContain(t, m, "Pages: 5+")
+	mustContain(t, m, "all loaded")
+	mustNotContain(t, m, "to load more...")
 	if !regexp.MustCompile(`Instances\[1\d\d\]`).MatchString(m.View()) { // 100+ running machines, counted exactly now
 		t.Errorf("the demo should hold 100+ running machines:\n%s", m.View())
 	}
@@ -332,9 +331,9 @@ func TestFilterDialogAcceptsOrAndNot(t *testing.T) {
 // the search box brings in the rest so a search sees (nearly) everything.
 func TestBackgroundPagesThenSearchLoadsTheRest(t *testing.T) {
 	m := startWith(t, aws.NewDemo(10), 150, 40, func(c *config.Config) { c.Prefetch, c.SearchPrefetch = 3, 10 })
-	mustContain(t, m, "Pages: 4+", "Instances[40+]") // page 1 plus three background pages; the rest still missing
+	mustContain(t, m, "Press n to load more...", "Instances[40+]") // page 1 plus three background pages; the rest still missing
 	m = press(m, "/")
-	if regexp.MustCompile(`Pages: \d+\+`).MatchString(m.View()) || strings.Contains(m.View(), "+]") {
+	if strings.Contains(m.View(), "to load more...") || strings.Contains(m.View(), "+]") {
 		t.Errorf("opening search should have loaded everything:\n%s", m.View())
 	}
 	m = typeText(m, "batch-worker-2")

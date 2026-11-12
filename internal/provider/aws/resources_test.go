@@ -91,7 +91,7 @@ func TestASGRowAndDrill(t *testing.T) {
 	})
 	assertCells(t, row, r, "web", "2", "3", "1/5")
 	d, err := r.Drill(context.Background(), row)
-	if err != nil || d.Resource.Name() != "Instances(web)" || d.Filters[0].Value != "web" {
+	if err != nil || d.Resource.Name() != "Instances (web)" || d.Filters[0].Value != "web" {
 		t.Fatalf("drill: %+v %v", d, err)
 	}
 }
@@ -126,7 +126,7 @@ func TestECSClusterRowAndGuards(t *testing.T) {
 		ClusterName: awssdk.String("prod"), ActiveServicesCount: 2, RunningTasksCount: 7, RegisteredContainerInstancesCount: 3,
 	})
 	assertCells(t, row, r, "prod", "2", "7", "3")
-	if d, err := r.Drill(context.Background(), row); err != nil || d.Resource.Name() != "prod" {
+	if d, err := r.Drill(context.Background(), row); err != nil || d.Resource.Name() != "ECS - prod" {
 		t.Fatalf("drill: %+v %v", d, err)
 	}
 	empty := ecsClusterRow(ecstypes.Cluster{ClusterName: awssdk.String("idle")})
@@ -143,7 +143,7 @@ func TestECSServiceRowAndGuards(t *testing.T) {
 		Deployments: []ecstypes.Deployment{{Status: awssdk.String("PRIMARY")}}, LaunchType: ecstypes.LaunchTypeEc2,
 	})
 	assertCells(t, row, r, "api", "ACTIVE", "REPLICA", "2 running / 3 desired", "PRIMARY", "api:42", "EC2")
-	if d, err := r.Drill(context.Background(), row); err != nil || d.Resource.Name() != "api(prod)" {
+	if d, err := r.Drill(context.Background(), row); err != nil || d.Resource.Name() != "api (prod)" {
 		t.Fatalf("drill: %+v %v", d, err)
 	}
 	idle := ecsServiceRow("prod", ecstypes.Service{ServiceName: awssdk.String("idle")}) // no deployments, no launch type
@@ -203,7 +203,7 @@ func TestEKSRowsAndDrills(t *testing.T) {
 	})
 	assertCells(t, crow, c, "kube", "1.30", "eks.5", "ACTIVE")
 	d, err := c.Drill(context.Background(), crow)
-	if err != nil || d.Resource.Name() != "kube" {
+	if err != nil || d.Resource.Name() != "EKS - kube" {
 		t.Fatalf("cluster drill: %+v %v", d, err)
 	}
 

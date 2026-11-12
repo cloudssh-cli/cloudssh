@@ -57,7 +57,7 @@ type ecsClusterRef struct {
 
 func (ecsClusters) Key() string                       { return "ecs" }
 func (ecsClusters) Label() string                     { return "ECS Clusters" }
-func (ecsClusters) Name() string                      { return "ECS Clusters" }
+func (ecsClusters) Name() string                      { return "ECS · Clusters" }
 func (ecsClusters) Crumb() string                     { return "ecs_clusters" }
 func (ecsClusters) Filters() []provider.FilterDef     { return nil }
 func (ecsClusters) DefaultFilters() []provider.Filter { return nil }
@@ -134,7 +134,7 @@ type ecsServiceRef struct {
 
 func (ecsServices) Key() string                       { return "ecs-services" }
 func (ecsServices) Label() string                     { return "ECS Services" }
-func (r ecsServices) Name() string                    { return r.cluster }
+func (r ecsServices) Name() string                    { return "ECS - " + r.cluster }
 func (ecsServices) Crumb() string                     { return "services" }
 func (ecsServices) Filters() []provider.FilterDef     { return nil }
 func (ecsServices) DefaultFilters() []provider.Filter { return nil }
@@ -211,7 +211,7 @@ type ecsTaskRef struct{ Cluster, ContainerInstanceARN string }
 
 func (ecsTasks) Key() string                       { return "ecs-tasks" }
 func (ecsTasks) Label() string                     { return "ECS Tasks" }
-func (r ecsTasks) Name() string                    { return r.service + "(" + r.cluster + ")" }
+func (r ecsTasks) Name() string                    { return r.service + " (" + r.cluster + ")" }
 func (ecsTasks) Crumb() string                     { return "tasks" }
 func (ecsTasks) Filters() []provider.FilterDef     { return nil }
 func (ecsTasks) DefaultFilters() []provider.Filter { return nil }
@@ -324,7 +324,7 @@ func (r ecsTasks) Drill(ctx context.Context, row provider.Row) (provider.Drill, 
 	}
 	id := awssdk.ToString(out.ContainerInstances[0].Ec2InstanceId)
 	return provider.Drill{
-		Resource: &instances{p: r.p},
+		Resource: &instances{p: r.p, sub: id + " · " + r.service + " (" + r.cluster + ")"},
 		Filters:  []provider.Filter{{Key: "instance-id", Value: id}},
 	}, nil
 }

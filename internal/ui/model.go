@@ -1066,12 +1066,12 @@ func (m Model) tableTitle(s *screen) string {
 
 func (m Model) emptyMessage(s *screen) string {
 	if s.loading {
-		return spinFrames[m.spin%len(spinFrames)] + " Loading " + strings.ToLower(s.res.Name()) + "..."
+		return spinFrames[m.spin%len(spinFrames)] + " Loading " + strings.ToLower(s.res.Label()) + "..."
 	}
 	if isProfiles(s) {
 		return m.profilesEmpty()
 	}
-	return "No " + strings.ToLower(s.res.Name()) + " found!"
+	return "No " + strings.ToLower(s.res.Label()) + " found!"
 }
 
 // profilesEmpty is the friendly empty state of the profiles screen: short,
@@ -1113,19 +1113,15 @@ func (m Model) footer(s *screen) string {
 
 	r := ""
 	if s != nil {
-		// "..." only while the first page is on its way; later background
-		// pages just raise the count
-		pages := hintKeyStyle.Render("...")
-		if s.pages > 0 || !s.loading {
-			n := fmt.Sprintf("%d", s.pages)
-			if s.nextToken != "" {
-				n += "+"
-			}
-			pages = hintKeyStyle.Render(n)
-		}
-		r = "Pages: " + pages
-		if s.pages > 0 && s.nextToken == "" && !s.loading {
-			r += " " + lipgloss.NewStyle().Foreground(colOK).Render("· all loaded")
+		switch {
+		case s.loading && s.pages == 0:
+			r = hintDescStyle.Render("Loading...")
+		case s.loading || s.budget > 0 && s.nextToken != "":
+			r = hintDescStyle.Render("Loading more...")
+		case s.nextToken != "":
+			r = "Press " + hintKeyStyle.Render("n") + " to load more..."
+		case s.pages > 0:
+			r = lipgloss.NewStyle().Foreground(colOK).Render("all loaded")
 		}
 	}
 	gap := max(m.width-lipgloss.Width(l)-lipgloss.Width(r), 1)

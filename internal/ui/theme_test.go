@@ -169,22 +169,21 @@ func TestBracketsGoBackAndForwardInAViewAndBracesThroughViews(t *testing.T) {
 	}
 }
 
-func TestFooterSaysAllLoadedAndShowsLoadingOnlyForTheFirstPage(t *testing.T) {
+func TestFooterSaysWhatToDoNextInsteadOfCountingPages(t *testing.T) {
 	m := loaded(t, fakeResource{pages: map[string]provider.Page{"": {Rows: rows("a")}}})
-	if v := m.View(); !strings.Contains(v, "Pages: 1") || !strings.Contains(v, "all loaded") {
+	if v := m.View(); !strings.Contains(v, "all loaded") || strings.Contains(v, "Pages:") {
 		t.Fatalf("a complete list should say so:\n%s", v)
 	}
 	m = loaded(t, threeRows()) // more pages exist
-	if v := m.View(); strings.Contains(v, "all loaded") || !strings.Contains(v, "Pages: 1+") {
-		t.Fatalf("an incomplete list must not claim to be complete:\n%s", v)
+	if v := m.View(); strings.Contains(v, "all loaded") || !strings.Contains(v, "Press n to load more...") {
+		t.Fatalf("an incomplete list tells how to get more:\n%s", v)
 	}
-	// a later page in flight leaves the count showing; only the first page shows "..."
-	m.cur().loading = true
-	if v := m.View(); !strings.Contains(v, "Pages: 1+") {
-		t.Fatalf("background pages must not blank the counter:\n%s", v)
+	m.cur().loading = true // a later page is in flight
+	if v := m.View(); !strings.Contains(v, "Loading more...") {
+		t.Fatalf("a background page says it is loading:\n%s", v)
 	}
 	fresh := newModel(threeRows())
-	if v := fresh.View(); !strings.Contains(v, "Pages: ...") {
+	if v := fresh.View(); !strings.Contains(v, "Loading...") {
 		t.Fatalf("the first page shows a loading marker:\n%s", v)
 	}
 }

@@ -17,7 +17,7 @@ type asgRef struct{ Name string }
 
 func (asgs) Key() string                       { return "asg" }
 func (asgs) Label() string                     { return "Auto Scaling Groups" }
-func (asgs) Name() string                      { return "Auto Scaling Groups" }
+func (asgs) Name() string                      { return "Auto Scaling · Groups" }
 func (asgs) Crumb() string                     { return "autoscaling_groups" }
 func (asgs) Filters() []provider.FilterDef     { return nil }
 func (asgs) DefaultFilters() []provider.Filter { return nil }

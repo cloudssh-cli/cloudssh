@@ -97,6 +97,21 @@ func wrap(s string, w int) []string {
 	return strings.Split(ansi.Wrap(s, w, ""), "\n")
 }
 
+// hangingEntry renders "key  description" in width w; a long description wraps
+// onto continuation lines aligned under the description, so nothing is cropped.
+func hangingEntry(e helpEntry, keyW, w int) []string {
+	indent := 2 + keyW + 2
+	var out []string
+	for i, l := range wrap(e.desc, max(w-indent, 8)) {
+		lead := strings.Repeat(" ", indent)
+		if i == 0 {
+			lead = "  " + helpKeyStyle.Render(fit(e.key, keyW)) + "  "
+		}
+		out = append(out, lead+hintDescStyle.Render(l))
+	}
+	return out
+}
+
 // renderSection draws one section at width w: a ruled heading, then either
 // one entry per line or compact "key label" chips wrapped between items.
 func renderSection(sec helpSection, w int) []string {
@@ -109,7 +124,7 @@ func renderSection(sec helpSection, w int) []string {
 			kw = max(kw, lipgloss.Width(e.key))
 		}
 		for _, e := range sec.entries {
-			out = append(out, "  "+helpKeyStyle.Render(fit(e.key, kw))+"  "+hintDescStyle.Render(e.desc))
+			out = append(out, hangingEntry(e, kw, w)...)
 		}
 		return append(out, "")
 	}
@@ -124,6 +139,11 @@ func renderSection(sec helpSection, w int) []string {
 	for _, e := range sec.entries {
 		item := helpKeyStyle.Render(e.key) + " " + hintDescStyle.Render(e.desc)
 		iw := lipgloss.Width(e.key) + 1 + lipgloss.Width(e.desc)
+		if iw > w-2 { // too long for any line: wrap it on its own, never crop
+			flush()
+			out = append(out, hangingEntry(e, lipgloss.Width(e.key), w)...)
+			continue
+		}
 		if lineW > 2 && lineW+3+iw > w {
 			flush()
 		}

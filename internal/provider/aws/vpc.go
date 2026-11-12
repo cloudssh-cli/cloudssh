@@ -28,7 +28,7 @@ type vpcRef struct{ ID string }
 
 func (vpcs) Key() string                       { return "vpc" }
 func (vpcs) Label() string                     { return "Virtual Private Clouds" }
-func (vpcs) Name() string                      { return "Virtual Private Clouds" }
+func (vpcs) Name() string                      { return "VPC · Networks" }
 func (vpcs) Crumb() string                     { return "vpcs" }
 func (vpcs) Filters() []provider.FilterDef     { return defsOf(vpcSpecs) }
 func (vpcs) DefaultFilters() []provider.Filter { return nil }
@@ -98,9 +98,14 @@ type subnets struct {
 
 type subnetRef struct{ ID string }
 
-func (subnets) Key() string                       { return "subnets" }
-func (subnets) Label() string                     { return "Subnets" }
-func (subnets) Name() string                      { return "Subnets" }
+func (subnets) Key() string   { return "subnets" }
+func (subnets) Label() string { return "Subnets" }
+func (r subnets) Name() string {
+	if r.vpc != "" {
+		return "VPC - " + r.vpc
+	}
+	return "Subnets"
+}
 func (subnets) Crumb() string                     { return "subnets" }
 func (subnets) Filters() []provider.FilterDef     { return defsOf(subnetSpecs) }
 func (subnets) DefaultFilters() []provider.Filter { return nil }
@@ -153,7 +158,7 @@ func (r subnets) Drill(_ context.Context, row provider.Row) (provider.Drill, err
 		return provider.Drill{}, fmt.Errorf("no subnet selected")
 	}
 	return provider.Drill{
-		Resource: &instances{p: r.p},
+		Resource: &instances{p: r.p, sub: ref.ID},
 		Filters:  []provider.Filter{{Key: "subnet-id", Value: ref.ID}},
 	}, nil
 }
