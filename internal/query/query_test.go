@@ -6,45 +6,84 @@ import (
 	"testing"
 )
 
-func TestParse(t *testing.T) {
-	for in, want := range map[string]Expr{
-		"":            {},
-		"web":         {Any: [][]string{{"web"}}},
-		"web api":     {Any: [][]string{{"web", "api"}}},
-		"web&api":     {Any: [][]string{{"web", "api"}}},
-		"web|api":     {Any: [][]string{{"web"}, {"api"}}},
-		"web,api":     {Any: [][]string{{"web"}, {"api"}}},
-		"web api|db":  {Any: [][]string{{"web", "api"}, {"db"}}},
-		"web !canary": {Any: [][]string{{"web"}}, Not: []string{"canary"}},
-		"!a|b !c":     {Any: [][]string{{"b"}}, Not: []string{"a", "c"}},
-		" | , & ! ":   {},
-		"&web,|api":   {Any: [][]string{{"web"}, {"api"}}}, // stray operators are ignored
-	} {
-		if got := Parse(in); !reflect.DeepEqual(got, want) {
-			t.Errorf("Parse(%q) = %+v, want %+v", in, got, want)
-		}
-	}
-}
-
-func TestMatchAndServerTerms(t *testing.T) {
+func TestMatch(t *testing.T) {
 	text := "i-0abc web-prod-1 running us-east-1a"
 	has := func(term string) bool { return strings.Contains(text, term) }
 	for q, want := range map[string]bool{
 		"": true, "web": true, "db": false, "db|web": true, "web running": true, "web&stopped": false,
-		"web !canary": true, "web !running": false, "db|running !stop": true, "!web": false, "db cache|stopped": false,
+		"web !canary": true, "web !running": false, "db|running !stop": true, "!web": false,
+		"db cache|stopped": false, "web&(db|running)": true, "web&(db|cache)": false, "(db|cache) web": false,
+		"!(db|cache)": true, "!(db|web)": false, "web,db": true, "! web": false, "(web)": true,
+		// precedence: "!" now binds to its own term only
+		"db|web !canary": true, "db|web !running": false, // = db | (web AND NOT running) "(db|web) !running": false,
 	} {
 		if got := Parse(q).Match(has); got != want {
 			t.Errorf("Match(%q) = %v, want %v", q, got, want)
 		}
 	}
-	e := Parse("web api|db !canary")
-	if got := e.ServerTerms(); !reflect.DeepEqual(got, []string{"web", "db"}) {
-		t.Errorf("ServerTerms: %v", got)
+}
+
+func TestForgivingWhileTyping(t *testing.T) {
+	has := func(term string) bool { return term == "web" }
+	for q, want := range map[string]bool{
+		"(web":         true, // missing ")" is closed at the end
+		"web)":         true, // stray ")" is ignored
+		"web&":         true,
+		"|web|":        true,
+		"&web,|api":    true,
+		"(":            true,
+		")":            true,
+		" | , & ! ( )": true,
+		"web !":        true,
+		"!":            true,
+		"api|":         false,
+		"web&(api":     false,
+		"((web))":      true,
+		"a!b":          false, // "!" inside a term is literal
+	} {
+		if got := Parse(q).Match(has); got != want {
+			t.Errorf("Match(%q) = %v, want %v", q, got, want)
+		}
 	}
-	if e.ExactOnServer() || !Parse("a|b").ExactOnServer() || Parse("a b").ExactOnServer() || Parse("a !b").ExactOnServer() {
-		t.Error("ExactOnServer is true only for a plain OR of single terms")
+}
+
+func TestEmpty(t *testing.T) {
+	for _, q := range []string{"", " ", " | , & ! ", "()", "!", "( )"} {
+		if !Parse(q).Empty() {
+			t.Errorf("%q should be empty", q)
+		}
 	}
-	if !Parse("!a").Empty() == false || !Parse("").Empty() {
-		t.Error("Empty")
+	if Parse("!a").Empty() || Parse("a").Empty() {
+		t.Error("real terms are not empty")
+	}
+}
+
+func TestServerTerms(t *testing.T) {
+	for q, want := range map[string][]string{
+		"":                nil,
+		"web":             {"web"},
+		"web|api":         {"web", "api"},
+		"web api|db":      {"web", "db"},
+		"web&(api|batch)": {"web"}, // the tightest conjunct
+		"(a|b|c) d":       {"d"},   // 1 term beats 3
+		"!web":            nil,     // nothing to narrow by
+		"web !canary":     {"web"},
+		"a|!b":            nil, // one alternative is unbounded
+		"a|a|b":           {"a", "b"},
+	} {
+		if got := Parse(q).ServerTerms(); !reflect.DeepEqual(got, want) {
+			t.Errorf("ServerTerms(%q) = %v, want %v", q, got, want)
+		}
+	}
+}
+
+func TestExactOnServer(t *testing.T) {
+	for q, want := range map[string]bool{
+		"": true, "a": true, "a|b": true, "a,b": true,
+		"a b": false, "a !b": false, "!a": false, "a&(b|c)": false, "(a|b)": true,
+	} {
+		if got := Parse(q).ExactOnServer(); got != want {
+			t.Errorf("ExactOnServer(%q) = %v, want %v", q, got, want)
+		}
 	}
 }

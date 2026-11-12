@@ -319,9 +319,9 @@ func TestDemoHasOverAHundredMachinesInFivePagesOfTwentyFive(t *testing.T) {
 func TestFilterDialogAcceptsOrAndNot(t *testing.T) {
 	m := demo(t)
 	m = press(m, "F", "up", "up", "up", "up", "up", "up") // Instance Name
-	m = typeText(m, "web-prod,api-prod,!web-prod-4")
+	m = typeText(m, "(web-prod|api-prod) !web-prod-4")
 	m = press(m, "enter")
-	mustContain(t, m, "web-prod-1", "web-prod-3", "api-prod-1", "name=web-prod,api-prod,!web-prod-4")
+	mustContain(t, m, "web-prod-1", "web-prod-3", "api-prod-1", "name=(web-prod|api-prod) !web-prod-4")
 	if n := strings.Count(m.View(), "web-prod-4"); n != 1 { // only inside the filter chip, never as a row
 		t.Errorf("web-prod-4 must be excluded from the rows (seen %d times):\n%s", n, m.View())
 	}

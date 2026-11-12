@@ -9,12 +9,12 @@ import (
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 )
 
-func TestBuildFiltersTurnsCommasIntoAlternativesAndSkipsNegations(t *testing.T) {
+func TestBuildFiltersTurnsOrIntoAlternativesAndSkipsNegations(t *testing.T) {
 	got := buildFilters(ec2Specs, []provider.Filter{
 		{Key: "instance-name", Value: "web,api"},     // two alternatives, partial match
 		{Key: "instance-id", Value: "i-1,i-2"},       // two exact alternatives
 		{Key: "state", Value: "!terminated"},         // not expressible in the API: applied afterwards
-		{Key: "instance-type", Value: "t3,!t3.nano"}, // include part only
+		{Key: "instance-type", Value: "t3 !t3.nano"}, // include part only
 	})
 	if len(got) != 3 {
 		t.Fatalf("filters: %+v", got)
@@ -42,11 +42,11 @@ func TestInstanceListUnderstandsOrAndNot(t *testing.T) {
 	if len(or) != 2 || or[0] != "web-prod-1" || or[1] != "web-prod-2" {
 		t.Fatalf("or: %v", or)
 	}
-	mixed := names(provider.Filter{Key: "instance-name", Value: "web-prod,!web-prod-4"})
+	mixed := names(provider.Filter{Key: "instance-name", Value: "web-prod !web-prod-4"})
 	if len(mixed) != 3 {
 		t.Fatalf("include web-prod but not -4: %v", mixed)
 	}
-	not := names(provider.Filter{Key: "state", Value: "running"}, provider.Filter{Key: "instance-name", Value: "!web,!api,!batch,!eks,!ecs"})
+	not := names(provider.Filter{Key: "state", Value: "running"}, provider.Filter{Key: "instance-name", Value: "!web !api !batch !eks !ecs"})
 	for _, n := range not {
 		if strings.Contains(n, "web") || strings.Contains(n, "api") || strings.Contains(n, "batch") || strings.Contains(n, "eks") || strings.Contains(n, "ecs") {
 			t.Fatalf("%q should have been excluded: %v", n, not)
@@ -54,6 +54,10 @@ func TestInstanceListUnderstandsOrAndNot(t *testing.T) {
 	}
 	if len(not) == 0 {
 		t.Fatal("bastion and friends should remain")
+	}
+	grouped := names(provider.Filter{Key: "instance-name", Value: "web-prod&(1|2) !web-prod-2"})
+	if len(grouped) != 1 || grouped[0] != "web-prod-1" {
+		t.Fatalf("grouped: %v", grouped)
 	}
 	and := names(provider.Filter{Key: "instance-name", Value: "web prod"})
 	if len(and) != 4 {
