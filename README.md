@@ -41,8 +41,8 @@ Start on a specific screen with `--view dashboard|ec2|ecs|eks|asg|vpc`. Press `?
 | `enter` | drill into the row (ASG → instances, VPC → subnets → instances, ECS cluster → services → tasks → instance, EKS cluster → node groups → instances); on instances, SSH |
 | `esc` | clear search, then go back one level |
 | `S` | SSH dialog: user, private/public IP, command preview, and a *Method* choice (`tab` to the row, `←/→` to change) to connect with [EC2 Instance Connect](#ec2-instance-connect) instead of your own key |
-| `/` `f` `s` | search loaded rows (`↑↓` in the box recall previous searches) |
-| `F` | server-side filters: every filter (name, state, type, AZ, IPs, ASG, …) is listed, fill in the ones you want (`R` resets them all) |
+| `/` `f` `s` | search loaded rows: `a\|b` means a or b, a space means and, `!a` means not a (`↑↓` in the box recall previous searches). The title shows `[25+]` and the footer says so while more pages exist |
+| `F` | server-side filters: every filter (name, state, type, AZ, IPs, ASG, …) is listed, fill in the ones you want; `a,b` means a or b and `!a` means not a (`R` resets them all) |
 | `shift`+letter | sort by a column, again to reverse (letters listed in `?`) |
 | `r` · `R` | refresh · reset filters, search and sort to defaults |
 | `n` `shift+→` | load next page |

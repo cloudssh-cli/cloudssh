@@ -56,11 +56,13 @@ func (r instances) List(ctx context.Context, q provider.Query) (provider.Page, e
 	if err != nil {
 		return provider.Page{}, err
 	}
-	var rows []provider.Row
+	var all []types.Instance
 	for _, res := range out.Reservations {
-		for _, i := range res.Instances {
-			rows = append(rows, instanceRow(i))
-		}
+		all = append(all, res.Instances...)
+	}
+	var rows []provider.Row
+	for _, i := range dropExcluded(all, ec2Specs, q.Filters, instanceField) {
+		rows = append(rows, instanceRow(i))
 	}
 	return provider.Page{Rows: rows, NextToken: awssdk.ToString(out.NextToken)}, nil
 }

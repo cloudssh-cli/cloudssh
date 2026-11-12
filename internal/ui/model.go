@@ -810,12 +810,16 @@ func (m Model) crumbs() []string {
 }
 
 func (m Model) tableTitle(s *screen) string {
+	count := fmt.Sprintf("[%d]", len(s.view))
+	if s.nextToken != "" {
+		count = fmt.Sprintf("[%d+]", len(s.view)) // a lower bound: more pages exist
+	}
 	search := "<all>"
 	if s.search != "" {
 		search = "</" + s.search + ">"
 	}
 	return lipgloss.NewStyle().Bold(true).Foreground(colPrimary).Render(s.res.Name()) +
-		lipgloss.NewStyle().Foreground(colAccent).Render(fmt.Sprintf("[%d]", len(s.view))) +
+		lipgloss.NewStyle().Foreground(colAccent).Render(count) +
 		lipgloss.NewStyle().Foreground(colSecondary).Render(search)
 }
 

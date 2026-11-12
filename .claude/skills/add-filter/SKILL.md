@@ -3,7 +3,7 @@ name: add-filter
 description: Add a server-side filter to an AWS resource in cloudssh (shown in the F dialog). Use when asked to filter EC2/VPC/subnet lists by another field.
 ---
 
-Filters are table-driven in `internal/provider/aws/filters.go`.
+Filters are table-driven in `internal/provider/aws/filters.go`. A filter value is a comma list: plain items are alternatives (or), items starting with `!` are exclusions (not). `buildFilters` sends the positive part to the API; `dropExcluded` applies the `!` part on the returned items (the EC2 API cannot express "not"), using the same field lookups (`filterfields.go`) as the demo fake. A new cloud should implement the same value syntax in its own filters.
 
 1. Add a `filterSpec{key, name, api, exact}` row to the resource's slice (`ec2Specs`, `vpcSpecs`, `subnetSpecs`):
    - `key`: stable id used by drills and defaults (kebab-case).
