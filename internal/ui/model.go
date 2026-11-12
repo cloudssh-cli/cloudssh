@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/config"
+	"github.com/SVMadhavaReddy/cloudssh/internal/logx"
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 	"github.com/SVMadhavaReddy/cloudssh/internal/sshx"
 )
@@ -24,8 +25,8 @@ const (
 	minTableH    = 3
 	statusTTL    = 4 * time.Second
 	historyMax   = 20
-	splashHold   = 500 * time.Millisecond
-	splashStep   = 100 * time.Millisecond
+	splashHold   = 300 * time.Millisecond
+	splashStep   = 60 * time.Millisecond
 )
 
 // loadedMsg carries a page back to the screen (sid) that asked for it.
@@ -78,7 +79,13 @@ type (
 	sshDoneMsg     struct{ err error }
 	clearStatusMsg struct{ seq int }
 	splashMsg      struct{ step int }
+	spinMsg        struct{}
 )
+
+const spinEvery = 100 * time.Millisecond
+
+// spinFrames is the loading indicator shown while a screen's first page is on its way.
+var spinFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 // Model is the root Bubble Tea model. Each mode (0 = dashboard, 1..n = the
 // provider's resources) keeps its own stack of screens, so switching views
@@ -103,7 +110,10 @@ type Model struct {
 	// detectTunnels lists tunnels the user already runs (replaceable in tests).
 	detectTunnels func(context.Context) []sshx.LocalTunnel
 	splashing     bool
+	splashHeld    bool // the logo was already held (by Boot): Init starts the fade at once
 	splashAt      int
+	spin          int  // frame of the loading indicator
+	spinning      bool // a spin tick is pending
 
 	// Sign-in. auth is nil for providers without profiles. While authErr is
 	// set the app shows the profiles screen instead of the resources.
@@ -179,7 +189,11 @@ func (m Model) Init() tea.Cmd {
 		cmds = append(cmds, s.load("", false))
 	}
 	if m.splashing {
-		cmds = append(cmds, tea.Tick(splashHold, func(time.Time) tea.Msg { return splashMsg{1} }))
+		hold := splashHold
+		if m.splashHeld {
+			hold = splashStep
+		}
+		cmds = append(cmds, tea.Tick(hold, func(time.Time) tea.Msg { return splashMsg{1} }))
 	}
 	return tea.Batch(cmds...)
 }
@@ -350,6 +364,7 @@ func (m *Model) useProfile(name string) tea.Cmd {
 // command is the process to run for a connection: real ssh, or in demo mode a
 // harmless local shell.
 func (m *Model) command(t sshx.Target) *exec.Cmd {
+	logx.L().Info("ssh", "command", t.CommandLine(), "demo", m.demo, "key_note", t.KeyNote)
 	if m.demo {
 		return t.DemoCommand()
 	}
@@ -404,7 +419,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
 	nm := next.(Model)
 	if e := nm.enrichVisible(); e != nil {
-		return nm, tea.Batch(cmd, e)
+		cmd = tea.Batch(cmd, e)
+	}
+	// the loading indicator animates only while a first load is on screen
+	if sc := nm.cur(); sc != nil && sc.loading && len(sc.rows) == 0 && !nm.spinning {
+		nm.spinning = true
+		cmd = tea.Batch(cmd, tea.Tick(spinEvery, func(time.Time) tea.Msg { return spinMsg{} }))
 	}
 	return nm, cmd
 }
@@ -427,6 +447,11 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.splashAt = msg.step
 		return m, tea.Tick(splashStep, func(time.Time) tea.Msg { return splashMsg{msg.step + 1} })
 
+	case spinMsg:
+		m.spinning = false // Update re-arms the tick while the first load is still running
+		m.spin++
+		return m, nil
+
 	case clearStatusMsg:
 		if msg.seq == m.statusSeq {
 			m.status = ""
@@ -440,6 +465,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		s.loading = false
 		if msg.err != nil {
+			logx.L().Error("load failed", "resource", s.res.Key(), "err", msg.err)
 			return m, m.setStatus("error: " + msg.err.Error())
 		}
 		if msg.append {
@@ -496,6 +522,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					s.rows[i].Cells[k] = "?"
 				}
 				s.rows[i].Partial = false
+				logx.L().Error("details failed", "id", msg.id, "err", msg.err)
 				cmd = m.setStatus("error: details for " + msg.id + ": " + msg.err.Error())
 			} else {
 				s.rows[i] = msg.row
@@ -517,6 +544,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case authDoneMsg:
 		m.authErr = msg.err
 		if msg.err != nil {
+			logx.L().Error("sign-in failed", "err", msg.err)
 			// Stay on the profiles screen; the footer explains, the list can be tried again.
 			var cmd tea.Cmd
 			if s := m.cur(); s != nil && isProfiles(s) {
@@ -542,6 +570,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case drilledMsg:
 		if msg.err != nil {
+			logx.L().Error("drill failed", "err", msg.err)
 			return m, m.setStatus("error: " + msg.err.Error())
 		}
 		for mode, st := range m.stacks {
@@ -556,6 +585,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case resolvedMsg:
 		if msg.err != nil {
+			logx.L().Error("resolving host failed", "err", msg.err)
 			return m, m.setStatus("error: " + msg.err.Error())
 		}
 		if msg.host.PrivateIP == "" && msg.host.PublicIP == "" {
@@ -568,6 +598,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tempKeyMsg:
 		if msg.err != nil {
+			logx.L().Error("temporary key failed", "err", msg.err)
 			msg.key.Cleanup()
 			return m, m.setStatus("error: " + msg.err.Error())
 		}
@@ -579,8 +610,10 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case sshDoneMsg:
 		if msg.err != nil {
+			logx.L().Error("ssh session failed", "err", msg.err)
 			return m, m.setStatus("error: ssh: " + msg.err.Error())
 		}
+		logx.L().Info("ssh session ended")
 		return m, m.setStatus("ssh session ended")
 
 	case tea.KeyMsg:
@@ -1021,7 +1054,7 @@ func (m Model) tableTitle(s *screen) string {
 
 func (m Model) emptyMessage(s *screen) string {
 	if s.loading {
-		return "Loading..."
+		return spinFrames[m.spin%len(spinFrames)] + " Loading " + strings.ToLower(s.res.Name()) + "..."
 	}
 	if isProfiles(s) {
 		return m.profilesEmpty()

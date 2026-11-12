@@ -6,13 +6,17 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
+	"slices"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/cloud"
 	"github.com/SVMadhavaReddy/cloudssh/internal/config"
+	"github.com/SVMadhavaReddy/cloudssh/internal/logx"
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
 	"github.com/SVMadhavaReddy/cloudssh/internal/ui"
 	"github.com/SVMadhavaReddy/cloudssh/internal/version"
@@ -24,10 +28,10 @@ const demoPageSize = 25
 
 func NewRootCmd() *cobra.Command {
 	var (
-		cfgPath                                            string
-		cloudName, profile, region, view, pems, ssh, theme string
-		pageSize                                           int
-		demo                                               bool
+		cfgPath                                                     string
+		cloudName, profile, region, view, pems, ssh, theme, logFile string
+		pageSize                                                    int
+		demo, logDebug                                              bool
 	)
 	cmd := &cobra.Command{
 		Use:           "cloudssh",
@@ -73,6 +77,19 @@ func NewRootCmd() *cobra.Command {
 			if theme != "" {
 				cfg.Theme = theme
 			}
+			if logFile == "" {
+				logFile = os.Getenv("CLOUDSSH_LOG")
+			}
+			if logFile != "" {
+				cfg.LogFile = logFile
+			}
+			cfg.LogDebug = cfg.LogDebug || logDebug
+			closeLog, err := logx.Init(config.ExpandHome(cfg.LogFile), cfg.LogDebug)
+			if err != nil {
+				return fmt.Errorf("log file: %w", err)
+			}
+			defer closeLog()
+			logx.L().Info("start", "version", version.Version, "cloud", cfg.Cloud, "demo", demo, "pem_files_path", cfg.PemFilesPath)
 			if dir, err := config.ThemesDir(); err == nil {
 				ui.LoadThemes(dir)
 			}
@@ -80,17 +97,31 @@ func NewRootCmd() *cobra.Command {
 				return err
 			}
 
-			prov, err := cloud.Open(context.Background(), cfg.Cloud, provider.Options{
-				Profile: cfg.Profile, Region: cfg.Region, PageSize: cfg.PageSize, Demo: demo,
-			})
+			if !slices.Contains(cloud.Names(), cfg.Cloud) { // fail before the TUI takes over the terminal
+				return fmt.Errorf("cloud %q is not supported (available: %s)", cfg.Cloud, strings.Join(cloud.Names(), ", "))
+			}
+			open := func() (provider.Provider, error) {
+				began := time.Now()
+				prov, err := cloud.Open(context.Background(), cfg.Cloud, provider.Options{
+					Profile: cfg.Profile, Region: cfg.Region, PageSize: cfg.PageSize, Demo: demo,
+				})
+				if err == nil {
+					err = validateView(cfg.View, prov)
+				}
+				logx.L().Info("provider opened", "took", time.Since(began).Round(time.Millisecond), "err", err)
+				return prov, err
+			}
+			// The TUI starts first and signs in behind the splash: opening a
+			// cloud can take seconds (SSO, token refresh) and must not leave
+			// a blank terminal.
+			final, err := tea.NewProgram(ui.NewBoot(cfg, open), tea.WithAltScreen()).Run()
 			if err != nil {
 				return err
 			}
-			if err := validateView(cfg.View, prov); err != nil {
-				return err
+			if b, ok := final.(ui.Boot); ok {
+				return b.Err()
 			}
-			_, err = tea.NewProgram(ui.New(cfg, prov), tea.WithAltScreen()).Run()
-			return err
+			return nil
 		},
 	}
 	f := cmd.Flags()
@@ -100,6 +131,8 @@ func NewRootCmd() *cobra.Command {
 	f.StringVar(&region, "region", "", "region (cloud specific)")
 	f.BoolVar(&demo, "demo", false, "run on built-in sample data: no cloud account or network needed, ssh opens a harmless local shell")
 	f.StringVar(&ssh, "ssh-method", "", fmt.Sprintf("default connection method: %q (your keys) or %q (a short-lived key pushed through the cloud, when offered)", config.SSHMethodSSH, config.SSHMethodTemporaryKey))
+	f.StringVar(&logFile, "log-file", "", "write a debug log (sign-in timing, errors, ssh commands) to this file; also $CLOUDSSH_LOG or log_file in the config")
+	f.BoolVar(&logDebug, "debug", false, "log more detail (with --log-file)")
 	f.StringVar(&pems, "pem-files-path", "", "directory holding <key-pair-name>.pem files")
 	f.IntVar(&pageSize, "page-size", 0, "items per page (minimum 5)")
 	f.StringVar(&theme, "theme", "", "colour theme: "+strings.Join(ui.ThemeNames(), ", ")+" (default auto: follows the terminal background, dark if unknown); your own: <config dir>/themes/<name>.yaml")

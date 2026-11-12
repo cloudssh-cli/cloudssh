@@ -107,7 +107,7 @@ Config (`~/.config/cloudssh/config.yaml`, `$XDG_CONFIG_HOME/cloudssh/config.yaml
 cloud: aws
 profile: default
 region: us-east-1
-pem_files_path: ~/.cloudssh/pems   # <key-pair-name>.pem is passed with -i when present
+pem_files_path: ~/.cloudssh/pems   # <key-pair-name>.pem is passed with -i (alone, IdentitiesOnly) when present; a missing or too-open (not 600) key is flagged in the ssh dialog
 default_ip_type: private           # or public
 ssh_method: ssh                    # or temporary-key (a short-lived key pushed through the cloud, e.g. EC2 Instance Connect)
 page_size: 100                     # rows per page (AWS allows up to 1000 for EC2/VPC, 100 for Auto Scaling; EKS is capped lower)
@@ -116,6 +116,8 @@ search_prefetch_pages: 10          # extra pages loaded when you open search
 prefetch_delay_ms: 250             # pause between background pages
 view: ec2                          # dashboard, ec2, ecs, eks, asg or vpc
 skip_splash: false
+log_file: ""                        # debug log (sign-in timing, errors, ssh commands); or --log-file / $CLOUDSSH_LOG
+log_debug: false                    # more detail (or --debug)
 theme: auto                        # auto (follows the terminal, dark if unknown), dark or light; also --theme
 ```
 

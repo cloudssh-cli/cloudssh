@@ -36,6 +36,10 @@ type Config struct {
 	// chosen cloud. Empty (or unknown) opens the cloud's first resource.
 	View       string `yaml:"view"`
 	SkipSplash bool   `yaml:"skip_splash"`
+	// LogFile, when set, receives a debug log (sign-in timing, load and ssh
+	// errors, the ssh commands run). Empty = no log. LogDebug adds detail.
+	LogFile  string `yaml:"log_file"`
+	LogDebug bool   `yaml:"log_debug"`
 	// SSHMethod is the default connection method: SSHMethodSSH (your keys) or
 	// SSHMethodTemporaryKey (a short-lived key pushed through the cloud's own
 	// service, when the cloud offers one).
