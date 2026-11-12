@@ -227,7 +227,7 @@ func (sm *sshModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 		if err != nil {
 			return true, m.setStatus("error: " + err.Error())
 		}
-		// the terminal is handed to ssh on a cleared screen
+		// the terminal is handed to ssh on a screen of its own
 		return true, execSession(m.command(t), func(err error) tea.Msg { return sshDoneMsg{err} })
 	}
 	var cmd tea.Cmd

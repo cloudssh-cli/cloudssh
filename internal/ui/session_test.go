@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestSessionsStartOnAClearedScreenButKeepScrollback(t *testing.T) {
+func TestSessionsStartOnAFreshAlternateScreen(t *testing.T) {
 	cmd := exec.Command("sh", "-c", "echo session-output")
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -17,11 +17,11 @@ func TestSessionsStartOnAClearedScreenButKeepScrollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	if !strings.HasPrefix(got, "\x1b[2J\x1b[H") || !strings.Contains(got, "session-output") {
-		t.Fatalf("output %q must start with the clear sequence", got)
+	if !strings.HasPrefix(got, enterSessionScreen) || !strings.Contains(got, "session-output") {
+		t.Fatalf("output %q must start by entering the session screen", got)
 	}
-	if strings.Contains(got, "\x1b[3J") {
-		t.Fatal("must not wipe the user's scrollback")
+	if strings.Contains(got, "\x1b[3J") || strings.Contains(strings.TrimPrefix(got, enterSessionScreen), "\x1b[2J") {
+		t.Fatal("must never clear the user's own screen or scrollback")
 	}
 }
 
@@ -33,7 +33,7 @@ func TestSessionUsesTheWriterBubbleTeaProvidesWhenTheCommandHasNone(t *testing.T
 	if err := s.Run(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(out.String(), clearScreen) || !strings.Contains(out.String(), "hello") {
+	if !strings.HasPrefix(out.String(), enterSessionScreen) || !strings.Contains(out.String(), "hello") {
 		t.Fatalf("got %q", out.String())
 	}
 }
@@ -92,7 +92,7 @@ func fakeSSH(t *testing.T, script string) *exec.Cmd {
 	return exec.Command(path)
 }
 
-func TestSessionOutputIsWipedWhenItEnds(t *testing.T) {
+func TestSessionRunsOnItsOwnScreenAndLeavesTheUsersTerminalAlone(t *testing.T) {
 	cmd := exec.Command("sh", "-c", "echo session-output")
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -100,10 +100,10 @@ func TestSessionOutputIsWipedWhenItEnds(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	if !strings.HasSuffix(got, clearScreen) || !strings.Contains(got, "session-output") {
-		t.Fatalf("the screen must be cleared again after the session, so nothing is left behind: %q", got)
+	if !strings.HasSuffix(got, leaveSessionScreen) || !strings.Contains(got, "session-output") {
+		t.Fatalf("the session must run between enter and leave of the alternate screen: %q", got)
 	}
-	if strings.Contains(got, "\x1b[3J") {
-		t.Fatal("must not wipe the user's scrollback")
+	if strings.Contains(got, "\x1b[3J") || strings.Contains(strings.TrimPrefix(got, enterSessionScreen), "\x1b[2J") {
+		t.Fatal("must never clear the user's own screen or scrollback")
 	}
 }

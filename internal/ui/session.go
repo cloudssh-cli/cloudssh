@@ -14,11 +14,16 @@ import (
 	"github.com/SVMadhavaReddy/cloudssh/internal/logx"
 )
 
-// clearScreen clears the visible screen and homes the cursor. It deliberately
-// does not clear scrollback (3J): that history belongs to the user.
-const clearScreen = "\x1b[2J\x1b[H"
+const (
+	// enterSessionScreen switches to the terminal's alternate screen (blank,
+	// cursor homed) and leaveSessionScreen switches back. A session lives on
+	// that screen, so nothing of it (or of cloudssh) ever lands on the user's
+	// own terminal contents or scrollback, and nothing of theirs is cleared.
+	enterSessionScreen = "\x1b[?1049h\x1b[2J\x1b[H"
+	leaveSessionScreen = "\x1b[?1049l"
+)
 
-// cleanSession runs a command like tea.ExecProcess, but on a cleared screen,
+// cleanSession runs a command like tea.ExecProcess, but on a screen of its own,
 // so a session never starts underneath what the previous session (or the shell
 // cloudssh was launched from) left behind.
 type cleanSession struct {
@@ -53,11 +58,8 @@ func (c *cleanSession) Run() error {
 		w = c.cmd.Stdout
 	}
 	if w != nil {
-		_, _ = fmt.Fprint(w, clearScreen)
-		// The session ran on the terminal's normal screen, which is what the
-		// user's shell shows after cloudssh quits: wipe what it printed so
-		// none of it is left behind (scrollback is never touched).
-		defer func() { _, _ = fmt.Fprint(w, clearScreen) }()
+		_, _ = fmt.Fprint(w, enterSessionScreen)
+		defer func() { _, _ = fmt.Fprint(w, leaveSessionScreen) }()
 	}
 	return c.run(w)
 }
