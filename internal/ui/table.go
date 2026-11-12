@@ -168,14 +168,14 @@ func (t *table) headerLine(vis []vcol) string {
 	// markers say there is more off screen: « columns to the left, » to the right;
 	// bold chips so they stand out from the headings, with a space either side
 	if t.colStart > 0 {
-		lead = crumbActive.Render("«") + strings.Repeat(" ", gutter-1)
+		lead = hintKeyStyle.Render("«") + strings.Repeat(" ", gutter-1)
 	}
 	line := lead + strings.Join(parts, strings.Repeat(" ", colGap))
 	if n := len(vis); n > 0 {
 		last := vis[n-1]
 		if last.idx < len(t.cols)-1 || last.w < t.widths[last.idx] {
 			if pad := t.innerWidth() - lipgloss.Width(line) - 1; pad >= 0 {
-				line += strings.Repeat(" ", pad) + crumbActive.Render("»")
+				line += strings.Repeat(" ", pad) + hintKeyStyle.Render("»")
 			}
 		}
 	}
