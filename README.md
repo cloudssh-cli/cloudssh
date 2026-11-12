@@ -42,7 +42,7 @@ Start on a specific screen with `--view dashboard|ec2|ecs|eks|asg|vpc`. Press `?
 | `esc` `[` · `]` | clear search, then go back one level (`[` goes back, `]` forward again) |
 | `{` `}` | previous / next view, wrapping around the dashboard |
 | `S` | SSH dialog: user, private/public IP, command preview, and a *Method* choice (`tab` to the row, `←/→` to change) to connect with [EC2 Instance Connect](#ec2-instance-connect) instead of your own key |
-| `/` `f` `s` | search loaded rows. One syntax for search and filters: a space or `&` is AND, `\|` or `,` is OR, `!a` is NOT, `( )` groups (`web&(api\|db) !canary` = web and either api or db, but not canary; AND binds tighter than OR) (`↑↓` in the box recall previous searches). The first page shows at once, the next few load in the background, and opening search loads more; the title shows `[25+]` while pages remain |
+| `/` `f` `s` | search loaded rows. One syntax for search and filters: a space or `&` is AND, `\|` or `,` is OR, `!a` is NOT, `( )` groups. A space separates whole conditions, each evaluated on its own and ANDed: `web\|api !canary` = (web or api) and not canary; inside one condition `&` binds tighter than `\|` (`↑↓` in the box recall previous searches). The first page shows at once, the next few load in the background, and opening search loads more; the title shows `[25+]` while pages remain |
 | `F` | server-side filters: every filter (name, state, type, AZ, IPs, ASG, …) is listed, fill in the ones you want; the same syntax as search (below); `R` resets them all |
 | `shift`+letter | sort by a column, again to reverse (letters listed in `?`) |
 | `r` · `R` | refresh · reset filters, search and sort to defaults |

@@ -57,8 +57,8 @@ func helpSections(m *Model) []helpSection {
 			{"/ f s", "search"}, {"F", "filters"}, {"r", "refresh"}, {"R", "reset filters, search, sort"}, {"n", "next page"},
 		}},
 		{title: "Search & filters", entries: []helpEntry{
-			{"a b  a&b", "and"}, {"a|b  a,b", "or"}, {"!a", "not"}, {"( )", "group"},
-			{"web&(api|db)", "web and either api or db"}, {"(a|b) !c", "a or b, but not c"},
+			{"a b  a&b", "and (space = whole conditions)"}, {"a|b  a,b", "or"}, {"!a", "not"}, {"( )", "group"},
+			{"web&(api|db)", "web and either api or db"}, {"a|b !c", "(a or b), and not c"},
 			{"", "the same in search and in filters"},
 		}},
 	}

@@ -12,7 +12,7 @@ func TestMatch(t *testing.T) {
 	for q, want := range map[string]bool{
 		"": true, "web": true, "db": false, "db|web": true, "web running": true, "web&stopped": false,
 		"web !canary": true, "web !running": false, "db|running !stop": true, "!web": false,
-		"db cache|stopped": false, "web&(db|running)": true, "web&(db|cache)": false, "(db|cache) web": false,
+		"db cache|stopped": false, "web api|running": true, "web api|stopped": false, "web cache|running": true, "web | db": true, "web & running": true, "( web )": true, "web&db|running": true, "web&(db|running)": true, "web&(db|cache)": false, "(db|cache) web": false,
 		"!(db|cache)": true, "!(db|web)": false, "web,db": true, "! web": false, "(web)": true,
 		// precedence: "!" now binds to its own term only
 		"db|web !canary": true, "db|web !running": false, // = db | (web AND NOT running) "(db|web) !running": false,
@@ -63,7 +63,8 @@ func TestServerTerms(t *testing.T) {
 		"":                nil,
 		"web":             {"web"},
 		"web|api":         {"web", "api"},
-		"web api|db":      {"web", "db"},
+		"web api|db":      {"web"}, // web AND (api|db): any one conjunct will do
+		"web|api !canary": {"web", "api"},
 		"web&(api|batch)": {"web"}, // the tightest conjunct
 		"(a|b|c) d":       {"d"},   // 1 term beats 3
 		"!web":            nil,     // nothing to narrow by

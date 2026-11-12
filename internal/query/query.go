@@ -2,14 +2,18 @@
 // (matching rows in memory) and filters (matching on the server and checked
 // again on the returned items).
 //
-//	web api         web AND api              (a space is AND)
 //	web&api         web AND api
 //	web|api         web OR api
 //	web,api         web OR api               (a comma is OR too)
-//	web&(api|db)    web AND (api OR db)      (parentheses group)
-//	web api|db      (web AND api) OR db      (AND binds tighter than OR)
-//	!canary         NOT canary
+//	web&api|db      (web AND api) OR db      (& binds tighter than |)
+//	web|api !canary (web OR api) AND NOT canary
+//	web&(api|db)    web AND (api OR db)
 //	!(a|b)          neither a nor b
+//
+// A space separates whole conditions, like an invisible pair of parentheses
+// around each: the pieces between spaces are evaluated on their own and then
+// ANDed. Inside one piece, & binds tighter than |. Spaces next to an operator
+// ("web | api") do not count as separators.
 //
 // A query with no usable term matches everything. Parsing never fails: while
 // someone is still typing, a missing ")" is closed at the end, a stray ")" or
@@ -38,8 +42,8 @@ type Expr struct{ root *node }
 
 // Parse reads s.
 func Parse(s string) Expr {
-	p := &parser{in: tokenize(s)}
-	return Expr{root: p.parseOr(0)}
+	p := &parser{in: squeeze(tokenize(s))}
+	return Expr{root: p.parseSeq(0)}
 }
 
 // tokenize splits s into terms and the operators ( ) | & !. A comma is "|",
@@ -90,67 +94,95 @@ func (p *parser) peek() string {
 	return ""
 }
 
-// parseOr: and ( "|" and )* ; stops at an unmatched ")".
-func (p *parser) parseOr(depth int) *node {
-	var alts []*node
-	for {
-		if n := p.parseAnd(depth); n != nil {
-			alts = append(alts, n)
+// squeeze drops spaces that only sit next to an operator or a bracket, so
+// "web | api" and "( web )" read like "web|api" and "(web)". The spaces left
+// separate whole conditions.
+func squeeze(in []string) []string {
+	opens := func(t string) bool { return t == "|" || t == "&" || t == "(" || t == "!" }
+	closes := func(t string) bool { return t == "|" || t == "&" || t == ")" }
+	var out []string
+	for i, t := range in {
+		if t == " " {
+			if len(out) == 0 || opens(out[len(out)-1]) || i+1 >= len(in) || closes(in[i+1]) || in[i+1] == " " {
+				continue
+			}
 		}
-		if p.peek() == "|" {
-			p.pos++
-			continue
-		}
-		if p.peek() == ")" && depth == 0 {
-			p.pos++ // stray ")": ignore and carry on
-			continue
-		}
-		break
+		out = append(out, t)
 	}
-	return join(kOr, alts)
+	return out
 }
 
-// parseAnd: unary ( ("&" | space) unary )*
-func (p *parser) parseAnd(depth int) *node {
+// parseSeq: space-separated conditions, ANDed. Stops at ")" inside brackets.
+func (p *parser) parseSeq(depth int) *node {
 	var parts []*node
 	for p.pos < len(p.in) {
-		t := p.peek()
-		if t == "|" || (t == ")" && depth > 0) || t == ")" {
-			break
-		}
-		if t == " " || t == "&" {
+		switch p.peek() {
+		case " ":
 			p.pos++
 			continue
+		case ")":
+			if depth > 0 {
+				return join(kAnd, parts)
+			}
+			p.pos++ // stray ")": ignore
+			continue
 		}
-		if n := p.parseUnary(depth); n != nil {
+		if n := p.parseOr(depth); n != nil {
 			parts = append(parts, n)
 		}
 	}
 	return join(kAnd, parts)
 }
 
+// parseOr: tight-and ( "|" tight-and )*
+func (p *parser) parseOr(depth int) *node {
+	var alts []*node
+	for {
+		if n := p.parseTight(depth); n != nil {
+			alts = append(alts, n)
+		}
+		if p.peek() != "|" {
+			break
+		}
+		p.pos++
+	}
+	return join(kOr, alts)
+}
+
+// parseTight: unary ( "&" unary )*
+func (p *parser) parseTight(depth int) *node {
+	var parts []*node
+	for {
+		if n := p.parseUnary(depth); n != nil {
+			parts = append(parts, n)
+		}
+		if p.peek() != "&" {
+			break
+		}
+		p.pos++
+	}
+	return join(kAnd, parts)
+}
+
 func (p *parser) parseUnary(depth int) *node {
-	t := p.peek()
-	p.pos++
-	switch t {
+	switch t := p.peek(); t {
+	case "", " ", "|", "&", ")":
+		return nil // nothing here; the caller deals with the token
 	case "!":
-		for p.peek() == " " {
-			p.pos++ // "! web" still means "!web"
-		}
-		if p.pos >= len(p.in) || strings.ContainsAny(p.peek(), "|&)") && len(p.peek()) == 1 {
-			return nil
-		}
+		p.pos++
 		if n := p.parseUnary(depth); n != nil {
 			return &node{kind: kNot, kids: []*node{n}}
 		}
 		return nil
 	case "(":
-		n := p.parseOr(depth + 1)
+		p.pos++
+		n := p.parseSeq(depth + 1)
 		if p.peek() == ")" {
 			p.pos++
 		}
 		return n
 	default:
+		p.pos++
 		return &node{kind: kTerm, term: t}
 	}
 }
