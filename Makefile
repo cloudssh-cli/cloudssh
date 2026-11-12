@@ -23,7 +23,7 @@ vuln: ## govulncheck
 build: ## build ./bin/cloudssh (linux, inside container)
 	$(RUN) go build -trimpath -o bin/cloudssh ./cmd/cloudssh
 run: ## run the TUI in a container (uses ~/.aws, ~/.ssh)
-	docker compose run --rm app
+	docker compose run --rm --build app
 check: fmt vet lint test ## everything CI runs
 shell: ## shell in the dev container
 	docker compose run --rm --build dev bash
