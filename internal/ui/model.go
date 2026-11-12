@@ -517,6 +517,9 @@ func ansiTrunc(s string, w int) string {
 	return fit(s, w)
 }
 
+// hints lists every shortcut worth showing, most important first. The header
+// flows them into as many columns as the terminal is wide, so nothing is
+// capped here; narrow terminals simply drop the trailing columns.
 func (m Model) hints() []hint {
 	var h []hint
 	if s := m.cur(); s != nil {
@@ -537,7 +540,11 @@ func (m Model) hints() []hint {
 			hint{"/ f s", "Open search"},
 			hint{"r", "Refresh data"},
 			hint{"R", "Reset defaults"},
-			hint{"n", "Next page"})
+			hint{"n", "Next page"},
+			hint{"shift+key", "Sort column (? lists keys)"},
+			hint{"↑↓ j k", "Move"},
+			hint{"pgup pgdn", "Page up / down"},
+			hint{"g G", "Top / bottom"})
 		if len(m.stacks[m.mode]) > 1 {
 			h = append(h, hint{"esc", "Go back"})
 		}
