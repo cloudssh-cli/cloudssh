@@ -12,5 +12,5 @@ Filters are table-driven in `internal/provider/aws/filters.go`.
    - `exact`: true for IDs; otherwise the value is wrapped as `*value*`.
 2. The resource's `Filters()` already returns `defsOf(specs)`, so the dialog lists it automatically (one row per filter, no cycling).
 3. Defaults go in the resource's `DefaultFilters()` (EC2: `state=running`). A drill supplies its own filters in `provider.Drill.Filters`, which replace the defaults on that screen; every key a drill uses must exist in the *target* resource's specs (see `TestEveryDrilledFilterKeyIsKnownToTarget`).
-4. Test with `buildFilters` in `resources_test.go` (wildcard vs exact, empty value skipped).
+4. Give it a short header label in `shortNames` (`filters.go`), a `FilterSamples` entry in the demo conformance test (or a drill-down that applies it), and make sure the demo data has rows it can match; the fake API rejects filter names it does not implement, so add the name to the fake too (`demo_api.go`). Test with `buildFilters` in `resources_test.go` (wildcard vs exact, empty value skipped).
 5. Services other than EC2/VPC/subnets (ASG, ECS, EKS) have no server-side filters; the UI shows "no filters available" for them.

@@ -6,15 +6,20 @@ k9s-style terminal UI (Go, Bubble Tea) to browse cloud resources (AWS first) and
 - `cmd/cloudssh` – entrypoint only
 - `internal/cli` – cobra root command, flag/config wiring
 - `internal/config` – YAML config + defaults
-- `internal/provider` – cloud-agnostic interfaces (`Provider`, `Resource`, `HostResolver`); `provider/aws` is the AWS impl
+- `internal/provider` – cloud-agnostic contract (`Provider`, `Resource`, optional `Drillable`/`HostResolver`/`Authenticator`/`Authorizer`/`Demoer`); `provider/aws` is the AWS impl; `provider/providertest` is the conformance suite every cloud must pass
+- `internal/cloud` – registry of cloud factories; each `provider/<cloud>` registers itself from `init()`, `internal/cli/clouds.go` imports them
+- `internal/e2e` – drives the real UI over the demo data (`cloudssh --demo`)
 - `internal/ui` – Bubble Tea model; depends only on provider interfaces
 - `internal/sshx` – builds `ssh` invocations; the TUI suspends (`tea.ExecProcess`) and execs system `ssh`. Never embed a terminal emulator.
 
 ## Rules
+- **Generic layers stay cloud-agnostic.** `internal/ui`, `internal/cli`, `internal/config`, `internal/sshx` and the provider contract must not name a cloud (comments aside). Cloud-specific text, defaults and behaviour live in the cloud's package; clouds are picked through `internal/cloud`.
+- **Demo data is part of the feature.** A resource/column/filter/drill/API-call change updates the demo data and keeps `providertest.Conformance` and `internal/e2e` green (`.claude/skills/demo-data`). Demo mode never runs real ssh or touches the network.
+- **No ctrl-key chords in the UI;** dialogs are tab/arrow driven (`.claude/skills/ui-keybindings`).
 - **All tooling runs in Docker** (`make test|lint|fmt|vet|check|run`). Don't install toolchains on the host.
 - Every package ships tests (`*_test.go`); new behaviour needs a test in the same commit. UI tests use a fake provider, AWS tests test pure mapping funcs; real-AWS tests carry `//go:build integration`.
 - **Always leave a fresh build.** After finishing any code change, run `make check` and then `make build`, so `./bin/cloudssh` is built from the latest code whenever the user tries it. A Stop hook (`.claude/hooks/ensure-build.sh`) enforces this: it rebuilds when sources are newer than the binary and blocks finishing if the build fails. The target platform comes from `local.mk`/env (see README "Build target"), never from tracked files.
 - **Small logical commits**, Conventional Commits (`feat(ec2): …`, `fix(ui): …`, `ci: …`). No `Co-Authored-By` trailers. Never push unless asked.
-- Not distributing yet: no release/publish pipeline (no GoReleaser, no release workflow). CI only runs checks. Conventional Commits keep semver/changelog possible later.
+- Not distributing yet: no release/publish pipeline (no GoReleaser, no release workflow). CI is parked (manual workflow only). Conventional Commits keep semver/changelog possible later.
 - Secrets used in CI: `AWS_ROLE_ARN` (OIDC, integration tests). Never commit credentials or `.pem` files.
-- Adding a cloud/resource: see `.claude/skills/add-resource`. Other skills: `add-filter`, `ui-keybindings`, `tui-preview` (render screens as text), `ship-changes` (commit/push flow).
+- Adding a cloud/resource: see `.claude/skills/add-resource`. Other skills: `add-cloud` (new cloud), `demo-data` (sample data, no drift), `add-filter`, `ui-keybindings`, `tui-preview` (render screens as text), `ship-changes` (commit/push flow).
