@@ -13,7 +13,7 @@ Key handling lives in `internal/ui/model.go` (`handleKey` → `updateKey`).
 
 **Checklist for a new binding**
 1. Handle it in `updateKey` (or the modal's `key`).
-2. Header hint in `Model.hints()` (list is uncapped; most important first; the header drops trailing columns on narrow terminals). `<?> Help` stays on the footer so it is always visible.
+2. Header hint in `Model.hints()` only for *action* keys (ssh, filters, search, refresh, reset, next page, back, views, dashboard, help, quit). Navigation (move/page/top/bottom/scroll), column sorting and the per-screen drill `enter` are intentionally NOT in the header: they live in `help.go` (`?`). The header drops trailing columns on narrow terminals; `<?> Help` also stays on the footer so it is always visible.
 3. Entry in `help.go` (`newHelp`).
 4. README key table.
 5. Tests in `nav_test.go`/`model_test.go`: the key works, it does not leak from search/modals, and `TestEveryStateFitsTheScreen` still passes.

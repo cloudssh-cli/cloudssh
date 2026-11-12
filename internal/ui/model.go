@@ -538,15 +538,13 @@ func ansiTrunc(s string, w int) string {
 	return fit(s, w)
 }
 
-// hints lists every shortcut worth showing, most important first. The header
-// flows them into as many columns as the terminal is wide, so nothing is
-// capped here; narrow terminals simply drop the trailing columns.
+// hints lists the action shortcuts shown in the header. Navigation, sorting
+// and drill-down keys are deliberately left out: they are discoverable from
+// the help screen (?), which keeps the header short and relevant. The header
+// flows hints into as many columns as the terminal fits.
 func (m Model) hints() []hint {
 	var h []hint
 	if s := m.cur(); s != nil {
-		if dr, ok := s.drillable(); ok {
-			h = append(h, hint{"enter", dr.DrillHint()})
-		}
 		if s.sshable() {
 			if _, drill := s.drillable(); drill {
 				h = append(h, hint{"S", "SSH session"})
@@ -561,11 +559,7 @@ func (m Model) hints() []hint {
 			hint{"/ f s", "Open search"},
 			hint{"r", "Refresh data"},
 			hint{"R", "Reset defaults"},
-			hint{"n", "Next page"},
-			hint{"shift+key", "Sort column (? lists keys)"},
-			hint{"↑↓ j k", "Move"},
-			hint{"pgup pgdn", "Page up / down"},
-			hint{"g G", "Top / bottom"})
+			hint{"n", "Next page"})
 		if len(m.stacks[m.mode]) > 1 {
 			h = append(h, hint{"esc", "Go back"})
 		}

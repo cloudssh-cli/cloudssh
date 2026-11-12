@@ -63,8 +63,8 @@ func TestDrillShowsHintAndErrors(t *testing.T) {
 	parent.child = child
 	m := newModelWith(testCfg(), parent)
 	m = settle(m, m.Init())
-	if !strings.Contains(m.View(), "Child View") {
-		t.Fatal("drill hint missing from header")
+	if strings.Contains(m.View(), "Child View") {
+		t.Fatal("drill hints belong in help, not the header")
 	}
 	m, cmd := send(m, key("enter"))
 	m = settle(m, cmd)
@@ -439,13 +439,18 @@ func TestHelpHintSurvivesNarrowTerminals(t *testing.T) {
 	}
 }
 
-func TestHeaderShowsAllShortcutsOnWideTerminals(t *testing.T) {
+func TestHeaderListsOnlyActionShortcuts(t *testing.T) {
 	m := sized(loaded(t, filterable(&recorder{})), 220, 30)
 	v := m.View()
 	for _, want := range []string{"SSH session", "Update filters", "Open search", "Refresh data", "Reset defaults", "Next page",
-		"Sort column", "Move", "Page up / down", "Top / bottom", "Switch view", "Dashboard", "Help", "Quit"} {
+		"Switch view", "Dashboard", "Help", "Quit"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("wide header missing %q", want)
+		}
+	}
+	for _, gone := range []string{"Sort column", "Move", "Page up", "Top / bottom", "Scroll columns"} {
+		if strings.Contains(v, gone) {
+			t.Errorf("header should not list %q (it is in ? help)", gone)
 		}
 	}
 	// a narrow terminal drops trailing columns instead of overflowing
