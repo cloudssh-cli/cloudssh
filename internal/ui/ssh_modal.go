@@ -30,9 +30,8 @@ type sshModal struct {
 	both   bool // both IPs available -> user can switch
 	pemDir string
 
-	// A host launched with a key pair whose .pem is not in pemDir cannot be
-	// reached with plain ssh until the user points at a key file: Enter is
-	// refused and the Key field appears.
+	// A host launched with a key pair whose .pem is not in pemDir gets an
+	// optional Key file field; left empty, ssh uses the agent / default keys.
 	keyName    string          // the key pair the host expects ("" when it has none)
 	needKey    bool            // that .pem is missing
 	keyFile    textinput.Model // the key file the user chose instead
@@ -180,17 +179,18 @@ func (sm *sshModal) target() (sshx.Target, error) {
 	return sm.withTunnel(t), err
 }
 
-// errKey is a problem with the key file: the dialog stays open on the Key field.
+// errKey is a problem with the key file typed in: the dialog stays open on the Key field.
 type errKey string
 
 func (e errKey) Error() string { return string(e) }
 
-// withChosenKey adds the key file typed into the Key field, or refuses: the
-// host's own .pem is missing, so there is nothing to sign in with.
+// withChosenKey adds the key file typed into the Key field. Left empty, the
+// host's .pem stays missing and ssh uses the agent / default keys (Resolve's
+// KeyNote says so).
 func (sm *sshModal) withChosenKey(t sshx.Target) (sshx.Target, error) {
 	path := config.ExpandHome(strings.TrimSpace(sm.keyFile.Value()))
 	if path == "" {
-		return t, errKey(sm.keyName + ".pem was not found in " + sm.pemDir + ": enter a key file below, or use another Method")
+		return t, nil
 	}
 	ok, note := sshx.CheckKey(path)
 	if !ok {
@@ -282,28 +282,37 @@ func radio(on bool, label, detail string) string {
 	return mark + " " + label + " " + hintDescStyle.Render(detail)
 }
 
-func (sm *sshModal) preview() string {
+// preview is the command (and any key warning) as lines no wider than w, so
+// a long path or message wraps inside the dialog instead of breaking its frame.
+func (sm *sshModal) preview(w int) []string {
+	lines := func(style lipgloss.Style, text string) []string {
+		var out []string
+		for _, l := range wrap(text, w) {
+			out = append(out, "  "+style.Render(l))
+		}
+		return out
+	}
 	if sm.viaAuth {
 		h := sm.host
 		h.KeyName = ""
 		t, err := sshx.Resolve(h, sm.username(), sm.pref(), "")
 		if err != nil {
-			return errorStyle.Render(err.Error())
+			return lines(errorStyle, err.Error())
 		}
 		t.KeyFile, t.OnlyKey, t.KeyLabel = "<temporary key>", true, sm.auth.AuthLabel()
-		return statusStyle.Render(sm.withTunnel(t).DisplayLine())
+		return lines(statusStyle, sm.withTunnel(t).DisplayLine())
 	}
 	t, err := sm.target()
 	var ek errKey
-	if errors.As(err, &ek) {
-		return errorStyle.Render("needs a key file")
+	if errors.As(err, &ek) { // the Key file field already says what is wrong
+		return lines(hintDescStyle, "(fix the key file above)")
 	}
 	if err != nil {
-		return errorStyle.Render(err.Error())
+		return lines(errorStyle, err.Error())
 	}
-	out := statusStyle.Render("ssh " + strings.Join(t.Args(), " "))
+	out := lines(statusStyle, "ssh "+strings.Join(t.Args(), " "))
 	if t.KeyNote != "" {
-		out += "\n  " + errorStyle.Render("key: "+t.KeyNote)
+		out = append(out, lines(errorStyle, "key: "+t.KeyNote)...)
 	}
 	return out
 }
@@ -315,6 +324,7 @@ func (sm *sshModal) view(w, h int) string {
 		}
 		return "  " + lipgloss.NewStyle().Foreground(colAccent).Render(text)
 	}
+	tw := max(min(w-12, 76), 30) // widest text line inside the dialog
 	body := []string{"", label(fieldUser, "User"), "  " + sm.user.View(), ""}
 	if sm.both {
 		body = append(body, label(fieldAddress, "Address"),
@@ -325,12 +335,15 @@ func (sm *sshModal) view(w, h int) string {
 			"  "+radio(!sm.viaAuth, "SSH key", "your keys / agent")+"   "+radio(sm.viaAuth, sm.auth.AuthLabel(), "temporary key"), "")
 	}
 	if sm.needKey && !sm.viaAuth {
-		body = append(body, label(fieldKey, "Key file"), "  "+sm.keyFile.View(),
-			"  "+errorStyle.Render(sm.keyName+".pem not found in "+sm.pemDir), "")
+		body = append(body, label(fieldKey, "Key file (optional)"), "  "+sm.keyFile.View())
+		note, style := sm.keyName+".pem not found in "+sm.pemDir+"; left empty, ssh uses your agent / default keys", hintDescStyle
 		if sm.keyProblem != "" {
-			body = body[:len(body)-1]
-			body = append(body, "  "+errorStyle.Render(sm.keyProblem), "")
+			note, style = sm.keyProblem, errorStyle
 		}
+		for _, l := range wrap(note, tw) {
+			body = append(body, "  "+style.Render(l))
+		}
+		body = append(body, "")
 	}
 	if len(sm.tunnels) > 0 {
 		body = append(body, label(fieldRoute, "Route"),
@@ -340,7 +353,9 @@ func (sm *sshModal) view(w, h int) string {
 	if len(sm.fields()) > 1 {
 		hints = "tab next · ← → change · " + hints
 	}
-	body = append(body, "  "+lipgloss.NewStyle().Foreground(colAccent).Render("Command"), "  "+sm.preview(), "", hintDescStyle.Render("  "+hints))
+	body = append(body, "  "+lipgloss.NewStyle().Foreground(colAccent).Render("Command"))
+	body = append(body, sm.preview(tw)...)
+	body = append(body, "", hintDescStyle.Render("  "+hints))
 	bw := 0
 	for _, l := range body {
 		bw = max(bw, lipgloss.Width(l))

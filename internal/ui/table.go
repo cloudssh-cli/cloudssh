@@ -114,7 +114,7 @@ type vcol struct{ idx, w int }
 // visibleCols picks the columns that fit starting at colStart. The last one
 // may be shown truncated.
 func (t *table) visibleCols() []vcol {
-	avail := t.innerWidth() - 1 // leading space
+	avail := t.innerWidth() - 2 // leading space, and a last cell for the "more columns" arrow
 	var out []vcol
 	used := 0
 	for i := t.colStart; i < len(t.cols); i++ {
@@ -160,7 +160,20 @@ func (t *table) headerLine(vis []vcol) string {
 		}
 		parts[i] = st.Render(fit(t.label(v.idx), v.w))
 	}
-	return " " + strings.Join(parts, strings.Repeat(" ", colGap))
+	line := " " + strings.Join(parts, strings.Repeat(" ", colGap))
+	// arrows say there is more off screen: ‹ columns to the left, › to the right
+	if t.colStart > 0 {
+		line = hintKeyStyle.Render("‹") + line[1:]
+	}
+	if n := len(vis); n > 0 {
+		last := vis[n-1]
+		if last.idx < len(t.cols)-1 || last.w < t.widths[last.idx] {
+			if pad := t.innerWidth() - lipgloss.Width(line) - 1; pad >= 0 {
+				line += strings.Repeat(" ", pad) + hintKeyStyle.Render("›")
+			}
+		}
+	}
+	return line
 }
 
 func (t *table) rowLine(i int, vis []vcol) string {

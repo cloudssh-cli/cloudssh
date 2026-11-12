@@ -2,7 +2,9 @@ package ui
 
 import (
 	"bytes"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -37,7 +39,7 @@ func TestSessionUsesTheWriterBubbleTeaProvidesWhenTheCommandHasNone(t *testing.T
 }
 
 func TestSshFailureHoldsTheScreenUntilEnter(t *testing.T) {
-	cmd := exec.Command("sh", "-c", "echo 'user@host: Permission denied (publickey).' >&2; exit 255")
+	cmd := fakeSSH(t, "echo 'user@host: Permission denied (publickey).' >&2; exit 255")
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
 	cmd.Stdin = strings.NewReader("\n") // the user presses enter
@@ -54,7 +56,7 @@ func TestSshFailureHoldsTheScreenUntilEnter(t *testing.T) {
 }
 
 func TestOrdinaryRemoteFailuresDoNotPause(t *testing.T) {
-	cmd := exec.Command("sh", "-c", "exit 1") // the remote command's own status
+	cmd := fakeSSH(t, "exit 1") // the remote command's own status
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stdin = strings.NewReader("")
@@ -78,4 +80,14 @@ func TestSshHints(t *testing.T) {
 			t.Errorf("sshHint(%q) = %q, want it to mention %q", in, got, want)
 		}
 	}
+}
+
+// fakeSSH is a command named ssh (only those get the failure hold) running script.
+func fakeSSH(t *testing.T, script string) *exec.Cmd {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "ssh")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"+script+"\n"), 0o700); err != nil { //nolint:gosec // a test script
+		t.Fatal(err)
+	}
+	return exec.Command(path)
 }

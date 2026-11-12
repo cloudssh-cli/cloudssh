@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/SVMadhavaReddy/cloudssh/internal/config"
 	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
@@ -577,41 +578,58 @@ func keyModel(t *testing.T, pemDir string, demo bool) Model {
 	return m
 }
 
-func TestMissingPemBlocksSSHUntilAKeyFileIsChosen(t *testing.T) {
+func TestMissingPemOffersAKeyFileAndOtherwiseUsesTheAgent(t *testing.T) {
 	dir := t.TempDir()
 	m := keyModel(t, dir, false)
-	sm := m.modal.(*sshModal)
-	if !sm.needKey || !strings.Contains(m.View(), "Key file") || !strings.Contains(m.View(), "prod.pem not found") {
-		t.Fatalf("a missing pem must be explained with a Key file field:\n%s", m.View())
+	if v := m.View(); !strings.Contains(v, "Key file (optional)") || !strings.Contains(v, "prod.pem not found") || !strings.Contains(v, "agent") {
+		t.Fatalf("a missing pem must be explained with an optional Key file field:\n%s", v)
 	}
-	m, _ = send(m, key("enter")) // no key: refused, dialog stays, cursor goes to the Key field
-	if m.modal == nil {
-		t.Fatal("the dialog must stay open")
-	}
-	sm = m.modal.(*sshModal)
-	if sm.current() != fieldKey || !strings.Contains(m.View(), "enter a key file below") {
-		t.Fatalf("must say what to do and focus the Key field:\n%s", m.View())
+	tgt, err := m.modal.(*sshModal).target()
+	if err != nil || tgt.KeyFile != "" || strings.Contains(tgt.CommandLine(), "-i") {
+		t.Fatalf("with no key chosen ssh uses the agent keys: %+v %v", tgt, err)
 	}
 
-	m = typeKeys(m, filepath.Join(dir, "nope.pem")) // a path that does not exist
+	m, _ = send(m, key("tab"))                      // User -> Method
+	m, _ = send(m, key("tab"))                      // -> Key file
+	m = typeKeys(m, filepath.Join(dir, "nope.pem")) // a path that does not exist is refused
 	m, _ = send(m, key("enter"))
 	if m.modal == nil || !strings.Contains(m.View(), "no such file") {
-		t.Fatalf("a bad path must be refused:\n%s", m.View())
+		t.Fatalf("a bad path must be refused, dialog open:\n%s", m.View())
 	}
 
 	pem := filepath.Join(dir, "mine.pem")
 	if err := os.WriteFile(pem, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	m = typeKeys(m, "") // keep the field; replace its value
 	m.modal.(*sshModal).keyFile.SetValue(pem)
-	tgt, err := m.modal.(*sshModal).target()
-	if err != nil || tgt.KeyFile != pem || !tgt.OnlyKey {
+	if tgt, err = m.modal.(*sshModal).target(); err != nil || tgt.KeyFile != pem || !tgt.OnlyKey {
 		t.Fatalf("a real key file connects with that key: %+v %v", tgt, err)
 	}
 	m, cmd := send(m, key("enter"))
 	if m.modal != nil || cmd == nil {
 		t.Fatal("with a usable key, enter hands over to ssh")
+	}
+
+	m = keyModel(t, dir, false) // and with the field empty, enter goes straight to ssh
+	if m, cmd = send(m, key("enter")); m.modal != nil || cmd == nil {
+		t.Fatal("no key chosen: enter connects with the agent keys")
+	}
+}
+
+func TestSSHDialogLinesNeverBreakTheFrame(t *testing.T) {
+	dir := t.TempDir()
+	m := keyModel(t, dir, false)
+	m.modal.(*sshModal).keyFile.SetValue(filepath.Join(dir, strings.Repeat("deep/", 12)+"k.pem"))
+	m, _ = send(m, key("enter"))
+	for _, l := range strings.Split(m.View(), "\n") {
+		if w := lipgloss.Width(l); w > m.width {
+			t.Fatalf("line wider than the screen (%d): %q", w, l)
+		}
+	}
+	for _, l := range strings.Split(m.View(), "\n") {
+		if strings.HasPrefix(l, "│") != strings.HasSuffix(l, "│") {
+			t.Fatalf("a panel line lost its frame: %q", l)
+		}
 	}
 }
 
@@ -631,5 +649,25 @@ func TestPemPresentOrOtherMethodNeedsNoKeyField(t *testing.T) {
 	}
 	if keyModel(t, t.TempDir(), true).modal.(*sshModal).needKey {
 		t.Fatal("demo mode has no real key files to miss")
+	}
+}
+
+func TestHeaderArrowsShowHiddenColumns(t *testing.T) {
+	tb := newTable()
+	tb.setCols([]provider.Column{{Title: "AAAAAAAAAA"}, {Title: "BBBBBBBBBB"}, {Title: "CCCCCCCCCC"}})
+	tb.setRows([]provider.Row{{Cells: []string{"1", "2", "3"}}})
+	tb.resize(30, 8)
+	head := func() string { return strings.Split(tb.render("t", ""), "\n")[1] }
+	if h := head(); !strings.Contains(h, "›") || strings.Contains(h, "‹") {
+		t.Fatalf("columns hidden on the right: only › expected: %q", h)
+	}
+	tb.scrollRight()
+	if h := head(); !strings.Contains(h, "‹") {
+		t.Fatalf("scrolled right: ‹ expected: %q", h)
+	}
+	tb.resize(120, 8)
+	tb.colStart = 0
+	if h := head(); strings.Contains(h, "›") || strings.Contains(h, "‹") {
+		t.Fatalf("everything fits: no arrows: %q", h)
 	}
 }

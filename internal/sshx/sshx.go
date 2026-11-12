@@ -152,7 +152,7 @@ func shellQuote(s string) string {
 func (t Target) DemoCommand() *exec.Cmd {
 	shell := "exec sh -i"
 	if _, err := exec.LookPath("bash"); err == nil {
-		shell = "exec bash --noprofile --norc -i"
+		shell = "exec bash --noprofile --norc +m -i"
 	}
 	script := `printf '%s\n' "$1"; ` + shell
 

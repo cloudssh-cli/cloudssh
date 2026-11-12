@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -55,6 +56,11 @@ func (c *cleanSession) Run() error {
 		_, _ = fmt.Fprint(w, clearScreen)
 	}
 	tail := &tailBuffer{max: 4096}
+	// Only ssh is watched: a piped stderr would also stop a local shell
+	// (the demo session) from using the terminal for job control.
+	if filepath.Base(c.cmd.Path) != "ssh" {
+		return c.cmd.Run()
+	}
 	if c.cmd.Stderr != nil {
 		same := c.cmd.Stdout == c.cmd.Stderr // one writer for both: keep it one, so exec serialises the writes
 		c.cmd.Stderr = io.MultiWriter(c.cmd.Stderr, tail)
