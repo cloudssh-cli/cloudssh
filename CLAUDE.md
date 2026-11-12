@@ -17,4 +17,4 @@ The previous Python/Textual implementation lives on the `main-python` branch.
 - **Small logical commits**, Conventional Commits (`feat(ec2): …`, `fix(ui): …`, `ci: …`). No `Co-Authored-By` trailers. Never push unless asked.
 - Not distributing yet: no release/publish pipeline (no GoReleaser, no release workflow). CI only runs checks. Conventional Commits keep semver/changelog possible later.
 - Secrets used in CI: `AWS_ROLE_ARN` (OIDC, integration tests). Never commit credentials or `.pem` files.
-- Adding a cloud/resource: see `.claude/skills/add-resource`.
+- Adding a cloud/resource: see `.claude/skills/add-resource`. Other skills: `add-filter`, `ui-keybindings`, `tui-preview` (render screens as text), `ship-changes` (commit/push flow).
