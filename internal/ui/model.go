@@ -427,7 +427,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.setStatus("error: " + msg.err.Error())
 		}
 		key := msg.key
-		return m, tea.ExecProcess(m.command(msg.target), func(err error) tea.Msg {
+		return m, execSession(m.command(msg.target), func(err error) tea.Msg {
 			key.Cleanup() // the temporary key never outlives the session
 			return sshDoneMsg{err}
 		})

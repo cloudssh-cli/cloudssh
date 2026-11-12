@@ -113,7 +113,7 @@ func TestDemoCommandShowsTheCommandAndRunsOnlyALocalShell(t *testing.T) {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("demo shell: %v\n%s", err, out.String())
 	}
-	for _, want := range []string{"[demo mode]", "ssh -i '/tmp/my key.pem' ubuntu@10.0.1.5", "Nothing is sent anywhere", "reached-the-local-shell"} {
+	for _, want := range []string{"[demo] would run:", "ssh -i '/tmp/my key.pem' ubuntu@10.0.1.5", "local shell", "reached-the-local-shell"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
 		}

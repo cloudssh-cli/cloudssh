@@ -103,7 +103,7 @@ func (t Target) DemoCommand() *exec.Cmd {
 	if _, err := exec.LookPath("bash"); err == nil {
 		shell = "exec bash --noprofile --norc -i"
 	}
-	script := `printf '\n  [demo mode] cloudssh would have run:\n\n    %s\n\n  Nothing is sent anywhere: this is a local shell. Type exit to return to cloudssh.\n\n' "$1"; ` + shell
+	script := `printf '[demo] would run: %s  (local shell, type exit to return)\n\n' "$1"; ` + shell
 
 	who := t.User
 	if who == "" {

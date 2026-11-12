@@ -116,7 +116,7 @@ func (sm *sshModal) key(m *Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 			return true, m.setStatus("error: " + err.Error())
 		}
 		// ExecProcess suspends the TUI and gives ssh the real terminal.
-		return true, tea.ExecProcess(m.command(t), func(err error) tea.Msg { return sshDoneMsg{err} })
+		return true, execSession(m.command(t), func(err error) tea.Msg { return sshDoneMsg{err} })
 	}
 	var cmd tea.Cmd
 	sm.user, cmd = sm.user.Update(msg)

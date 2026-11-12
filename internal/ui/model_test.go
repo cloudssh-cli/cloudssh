@@ -542,7 +542,7 @@ func TestDemoModeIsMarkedAndNeverStartsRealSSH(t *testing.T) {
 		t.Error("demo mode has no real tunnels to look for")
 	}
 	target := sshx.Target{User: "ubuntu", Address: "10.0.0.1"}
-	if got := m.command(target); filepath.Base(got.Path) != "sh" || !strings.Contains(strings.Join(got.Args, " "), "[demo mode]") {
+	if got := m.command(target); filepath.Base(got.Path) != "sh" || !strings.Contains(strings.Join(got.Args, " "), "[demo] would run:") {
 		t.Fatalf("demo connection must be the local shell, got %v", got.Args)
 	}
 	real := newModel(fakeResource{})
