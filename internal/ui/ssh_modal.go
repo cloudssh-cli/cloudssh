@@ -194,7 +194,7 @@ func (sm *sshModal) authorize() tea.Cmd {
 		if err != nil {
 			return tempKeyMsg{key: key, err: err}
 		}
-		t.KeyFile, t.OnlyKey = key.Path, true
+		t.KeyFile, t.OnlyKey, t.KeyLabel = key.Path, true, auth.AuthLabel()
 		return tempKeyMsg{target: snapshot.withTunnel(t), key: key}
 	}
 }
@@ -223,8 +223,8 @@ func (sm *sshModal) preview() string {
 		if err != nil {
 			return errorStyle.Render(err.Error())
 		}
-		t.KeyFile, t.OnlyKey = "<temporary key>", true
-		return statusStyle.Render("ssh " + strings.Join(sm.withTunnel(t).Args(), " "))
+		t.KeyFile, t.OnlyKey, t.KeyLabel = "<temporary key>", true, sm.auth.AuthLabel()
+		return statusStyle.Render(sm.withTunnel(t).DisplayLine())
 	}
 	t, err := sm.target()
 	if err != nil {

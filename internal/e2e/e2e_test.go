@@ -195,7 +195,7 @@ func TestSSHDialogUsesTheDefaultUserFromTheImageAndOffersTheTemporaryKey(t *test
 	m = press(m, "S") // first row: api-prod-1, an Ubuntu machine
 	mustContain(t, m, "SSH => api-prod-1", "ubuntu@10.0.10.", "Method", "EC2 Instance Connect", "tab next")
 	m = press(m, "tab", "right") // to the Method field, then change it
-	mustContain(t, m, "<temporary key>", "IdentitiesOnly=yes")
+	mustContain(t, m, "-i <EC2 Instance Connect>", "IdentitiesOnly=yes")
 	m = press(m, "esc")
 	mustNotContain(t, m, "SSH =>")
 }

@@ -334,7 +334,7 @@ func TestSSHDialogOffersMethodOnlyWhenProviderSupportsIt(t *testing.T) {
 	}
 	m, _ = send(m, key("tab"))
 	m, _ = send(m, tea.KeyMsg{Type: tea.KeyRight})
-	if v := m.View(); !strings.Contains(v, "<temporary key>") || !strings.Contains(v, "IdentitiesOnly=yes") {
+	if v := m.View(); !strings.Contains(v, "-i <Fake Connect>") || !strings.Contains(v, "IdentitiesOnly=yes") {
 		t.Fatalf("preview should show the temporary key command:\n%s", v)
 	}
 }
@@ -343,7 +343,7 @@ func TestConfigCanDefaultToTheTemporaryKey(t *testing.T) {
 	cfg := testCfg()
 	cfg.SSHMethod = config.SSHMethodTemporaryKey
 	m := authModel(t, cfg, &fakeAuthProvider{})
-	if !m.modal.(*sshModal).viaAuth || !strings.Contains(m.View(), "<temporary key>") {
+	if !m.modal.(*sshModal).viaAuth || !strings.Contains(m.View(), "-i <Fake Connect>") {
 		t.Fatal("ssh_method: temporary-key should preselect the temporary key")
 	}
 	// but a provider without the capability falls back to plain ssh

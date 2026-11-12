@@ -31,10 +31,16 @@ type Target struct {
 	// KeyNote says why no pem file was added (or why the one added may not
 	// work), for display next to the command. Empty when all is well.
 	KeyNote string
+	// KeyLabel names a key that has no meaningful path to show (a temporary
+	// key pushed through the cloud, e.g. "EC2 Instance Connect"); display uses
+	// it instead of KeyFile.
+	KeyLabel string
 }
 
 // Args returns the argument vector for ssh (without the binary name).
-func (t Target) Args() []string {
+func (t Target) Args() []string { return t.args(t.KeyFile) }
+
+func (t Target) args(keyFile string) []string {
 	var args []string
 	if t.Port > 0 {
 		args = append(args, "-p", strconv.Itoa(t.Port))
@@ -42,8 +48,8 @@ func (t Target) Args() []string {
 	for _, o := range t.Options {
 		args = append(args, "-o", o)
 	}
-	if t.KeyFile != "" {
-		args = append(args, "-i", t.KeyFile)
+	if keyFile != "" {
+		args = append(args, "-i", keyFile)
 		if t.OnlyKey {
 			args = append(args, "-o", "IdentitiesOnly=yes")
 		}
@@ -140,10 +146,26 @@ func (t Target) DemoCommand() *exec.Cmd {
 }
 
 // CommandLine is the ssh command as a shell would take it, quoted.
-func (t Target) CommandLine() string {
-	args := t.Args()
+func (t Target) CommandLine() string { return line(t.Args(), "") }
+
+// DisplayLine is CommandLine for people: a labelled key shows as <label>
+// instead of the path of a throwaway file.
+func (t Target) DisplayLine() string {
+	if t.KeyLabel == "" || t.KeyFile == "" {
+		return t.CommandLine()
+	}
+	placeholder := "<" + t.KeyLabel + ">"
+	return line(t.args(placeholder), placeholder)
+}
+
+// line joins args, quoting each except raw (shown as is).
+func line(args []string, raw string) string {
 	parts := make([]string, len(args))
 	for i, a := range args {
+		if raw != "" && a == raw {
+			parts[i] = a
+			continue
+		}
 		parts[i] = shellQuote(a)
 	}
 	return "ssh " + strings.Join(parts, " ")
@@ -164,7 +186,11 @@ func (t Target) DemoTable() string {
 		rows = append(rows, [2]string{"Port", strconv.Itoa(t.Port)})
 	}
 	if t.KeyFile != "" {
-		rows = append(rows, [2]string{"Key", t.KeyFile})
+		key := t.KeyFile
+		if t.KeyLabel != "" {
+			key = t.KeyLabel + " (temporary key)"
+		}
+		rows = append(rows, [2]string{"Key", key})
 		if t.OnlyKey {
 			rows = append(rows, [2]string{"Offers", "only this key (IdentitiesOnly)"})
 		}
@@ -175,7 +201,7 @@ func (t Target) DemoTable() string {
 	if t.KeyNote != "" {
 		rows = append(rows, [2]string{"Key note", t.KeyNote})
 	}
-	rows = append(rows, [2]string{"Command", t.CommandLine()})
+	rows = append(rows, [2]string{"Command", t.DisplayLine()})
 
 	var lines [][2]string // wrapped rows; a continuation has an empty label
 	kw, vw := 0, 0

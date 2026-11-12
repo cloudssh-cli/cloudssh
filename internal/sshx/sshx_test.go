@@ -178,3 +178,17 @@ func TestDemoTableRowsAndWrapping(t *testing.T) {
 		}
 	}
 }
+
+func TestLabelledKeyShowsAsTheLabelNotATempPath(t *testing.T) {
+	tg := Target{User: "ec2-user", Address: "10.0.0.4", KeyFile: "/var/folders/x/cloudssh-key-1/id_ed25519", OnlyKey: true, KeyLabel: "EC2 Instance Connect"}
+	if got, want := tg.DisplayLine(), "ssh -i <EC2 Instance Connect> -o IdentitiesOnly=yes ec2-user@10.0.0.4"; got != want {
+		t.Fatalf("display:\n got %s\nwant %s", got, want)
+	}
+	if !strings.Contains(tg.CommandLine(), "cloudssh-key-1") {
+		t.Fatal("the real command still carries the real path")
+	}
+	tbl := tg.DemoTable()
+	if strings.Contains(tbl, "cloudssh-key-1") || !strings.Contains(tbl, "EC2 Instance Connect (temporary key)") {
+		t.Fatalf("table must not show the temp path:\n%s", tbl)
+	}
+}
