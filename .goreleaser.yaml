@@ -1,0 +1,62 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+project_name: cloudssh
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/cloudssh
+    binary: cloudssh
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X github.com/SVMadhavaReddy/cloudssh/internal/version.Version={{.Version}}
+      - -X github.com/SVMadhavaReddy/cloudssh/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/SVMadhavaReddy/cloudssh/internal/version.Date={{.Date}}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - { title: Features, regexp: '^feat', order: 0 }
+    - { title: Fixes, regexp: '^fix', order: 1 }
+    - { title: Other, order: 99 }
+  filters:
+    exclude: ['^docs', '^test', '^chore', '^ci', '^build\(deps\)']
+
+release:
+  github:
+    owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+    name: cloudssh
+
+# Updates Formula/cloudssh.rb in <owner>/homebrew-tap on every tag.
+# Needs the HOMEBREW_TAP_TOKEN secret (fine-grained PAT, contents:write on the tap).
+# Skipped when the token is empty, so releases work before the tap exists.
+brews:
+  - name: cloudssh
+    repository:
+      owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/{{ .Env.GITHUB_REPOSITORY_OWNER }}/cloudssh
+    description: k9s-style terminal UI to browse cloud resources and SSH into them
+    license: MIT
+    skip_upload: '{{ if .Env.HOMEBREW_TAP_TOKEN }}false{{ else }}true{{ end }}'
+    dependencies:
+      - name: openssh
+        type: optional
+    test: |
+      assert_match "cloudssh", shell_output("#{bin}/cloudssh --version")
