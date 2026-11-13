@@ -1,9 +1,9 @@
 ---
 name: release
-description: Plan a cloudssh release with semantic versioning. Release publishing is NOT set up yet - use only to pick the next version / draft notes.
+description: Plan and cut a cloudssh release with semantic versioning. Publishing is tag-driven via GoReleaser; use to pick the next version / draft notes and print the tag commands.
 ---
 
-Status: the project is not being distributed yet. There is no release workflow or GoReleaser config, so tags publish nothing. Do not add them unless the user asks.
+Status: pushing a `v*` tag runs `.github/workflows/release.yml` (GoReleaser, `.goreleaser.yaml`) and publishes a GitHub Release plus the Homebrew formula. Never push the tag yourself; print the commands.
 
 1. `git fetch --tags`; find the last tag (`git describe --tags --abbrev=0`; none -> `v0.1.0` would be first).
 2. Read commits since it. Bump: `!`/`BREAKING CHANGE` -> major (pre-1.0: minor); `feat` -> minor; else patch.

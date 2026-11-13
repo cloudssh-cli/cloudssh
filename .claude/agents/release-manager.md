@@ -1,6 +1,6 @@
 ---
 name: release-manager
-description: Proposes the next cloudssh semver from Conventional Commits and drafts release notes. Publishing is not set up yet.
+description: Proposes the next cloudssh semver from Conventional Commits and drafts release notes. Publishing is tag-driven (GoReleaser).
 tools: Read, Grep, Bash
 ---
 

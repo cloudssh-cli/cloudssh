@@ -6,7 +6,15 @@ SSH is the real `ssh` binary: cloudssh suspends its UI, hands your terminal to `
 
 ## Install
 
-Not distributed yet. Build and run from source via Docker:
+Homebrew (macOS and Linux), once the tap is published:
+
+```sh
+brew install <owner>/tap/cloudssh
+```
+
+Or download a binary for your OS/arch from the GitHub Releases page and put it on your `PATH`. Verify with `checksums.txt`.
+
+Build and run from source via Docker:
 
 ```sh
 make build   # ./bin/cloudssh; linux by default, see "Build target" below
