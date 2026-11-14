@@ -1,0 +1,33 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected and what you got. Screenshots of the screen help.
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes:
+      label: cloudssh version
+      description: Output of `cloudssh --version`
+    validations: { required: true }
+  - type: input
+    id: env
+    attributes:
+      label: OS and terminal
+      placeholder: macOS 15 arm64, iTerm2
+    validations: { required: true }
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options: [Homebrew, Install script, Release archive, Built from source]
+  - type: textarea
+    id: log
+    attributes:
+      label: Debug log (optional)
+      description: Run with `--log-file cloudssh.log --debug` and paste the relevant lines. Remove account ids, hostnames and IPs you do not want to share.
+      render: text

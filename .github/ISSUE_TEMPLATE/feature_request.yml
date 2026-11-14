@@ -1,0 +1,14 @@
+name: Feature request
+description: Suggest a resource, filter, cloud or improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the task, not only the feature. Which cloud and resource is it about?
+    validations: { required: true }
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to see?
