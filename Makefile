@@ -2,7 +2,7 @@
 # Set NO_DOCKER=1 (CI does) to run directly with a local toolchain.
 RUN := $(if $(NO_DOCKER),,docker compose run --rm --build dev)
 
-.PHONY: help tidy fmt vet lint test cover vuln build run check shell
+.PHONY: help tidy fmt vet lint test cover vuln build run check shell demo-gif
 help: ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "%-10s %s\n", $$1, $$2}'
 
@@ -35,3 +35,6 @@ run: ## run the TUI in a container (uses ~/.aws, ~/.ssh)
 check: fmt vet lint test ## everything CI runs
 shell: ## shell in the dev container
 	docker compose run --rm --build dev bash
+demo-gif: ## re-record docs/demo.gif from the demo data (VHS in Docker)
+	$(RUN) env CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o bin/linux/cloudssh ./cmd/cloudssh
+	docker run --rm -v "$(CURDIR)":/vhs -w /vhs ghcr.io/charmbracelet/vhs docs/demo.tape
