@@ -3,6 +3,7 @@
 [![CI](https://github.com/cloudssh-cli/cloudssh/actions/workflows/ci.yml/badge.svg)](https://github.com/cloudssh-cli/cloudssh/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/cloudssh-cli/cloudssh)](https://github.com/cloudssh-cli/cloudssh/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/cloudssh-cli/cloudssh/badge)](https://securityscorecards.dev/viewer/?uri=github.com/cloudssh-cli/cloudssh)
 
 A [k9s](https://k9scli.io)-style terminal UI for browsing cloud resources and SSHing into them. AWS today: EC2 instances, ECS (clusters → services → tasks), EKS (clusters → node groups), Auto Scaling Groups and VPCs (→ subnets). Other clouds are on the roadmap.
 
