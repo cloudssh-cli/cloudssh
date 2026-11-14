@@ -15,9 +15,9 @@ builds:
     flags: [-trimpath]
     ldflags:
       - -s -w
-      - -X github.com/SVMadhavaReddy/cloudssh/internal/version.Version={{.Version}}
-      - -X github.com/SVMadhavaReddy/cloudssh/internal/version.Commit={{.ShortCommit}}
-      - -X github.com/SVMadhavaReddy/cloudssh/internal/version.Date={{.Date}}
+      - -X github.com/cloudssh-cli/cloudssh/internal/version.Version={{.Version}}
+      - -X github.com/cloudssh-cli/cloudssh/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/cloudssh-cli/cloudssh/internal/version.Date={{.Date}}
 
 archives:
   - formats: [tar.gz]
@@ -27,17 +27,13 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# release-please already created the GitHub Release and its notes; GoReleaser only
+# attaches the archives and checksums to it.
 changelog:
-  use: github
-  sort: asc
-  groups:
-    - { title: Features, regexp: '^feat', order: 0 }
-    - { title: Fixes, regexp: '^fix', order: 1 }
-    - { title: Other, order: 99 }
-  filters:
-    exclude: ['^docs', '^test', '^chore', '^ci', '^build\(deps\)']
+  disable: true
 
 release:
+  mode: keep-existing
   github:
     owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
     name: cloudssh
