@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (2026-11-14)
+## [0.1.0](https://github.com/cloudssh-cli/cloudssh/releases/tag/v0.1.0) (2026-11-14)
 
 The first public release of **cloudssh**: a [k9s](https://k9scli.io)-style terminal UI for browsing your cloud resources and SSHing into them. AWS is supported today; the provider layer is cloud-agnostic, so other clouds can follow.
 
