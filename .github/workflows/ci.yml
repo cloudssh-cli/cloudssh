@@ -29,6 +29,13 @@ jobs:
           key: golangci-lint-v2.6.0-${{ runner.os }}-${{ hashFiles('go.mod') }}
       - if: steps.tool.outputs.cache-hit != 'true'
         run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.0
+      # golangci-lint's own analysis cache: unchanged packages are skipped on the next run.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/golangci-lint
+          key: golangci-lint-cache-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            golangci-lint-cache-${{ runner.os }}-${{ hashFiles('go.sum') }}-
       - run: ~/go/bin/golangci-lint run
 
   vuln:
