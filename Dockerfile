@@ -23,7 +23,7 @@ RUN go build -trimpath \
   -o /out/cloudssh ./cmd/cloudssh
 
 # ---- runtime: try cloudssh without installing anything (still needs ssh)
-FROM alpine:3.21 AS runtime
+FROM alpine:3.24 AS runtime
 RUN apk add --no-cache openssh-client ca-certificates
 COPY --from=build /out/cloudssh /usr/local/bin/cloudssh
 ENV TERM=xterm-256color
