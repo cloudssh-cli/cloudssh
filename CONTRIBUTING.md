@@ -13,6 +13,10 @@ Every guide ends the same way, so a change is safe to merge without a maintainer
 2. `make build`, then try it: `./bin/cloudssh --demo` (no cloud account needed; ssh opens a harmless local shell).
 3. Work on a branch and open a pull request; `main` is only changed by merged PRs. Use small logical commits in [Conventional Commits](https://www.conventionalcommits.org) style (`feat(gcp): ...`, `fix(ui): ...`); tests ship in the same commit as the behaviour.
 
+## Using Claude Code (or another assistant)
+
+`CLAUDE.md` (also surfaced as `AGENTS.md`) and `.claude/skills/` are shared, project-level guidance: they apply to everyone and contain no personal preferences. Personal setup stays out of git: put your own permissions or hooks in `.claude/settings.local.json` (gitignored). For example, to rebuild `./bin/cloudssh` after every assistant turn, register `.claude/hooks/ensure-build.sh` as a `Stop` hook there.
+
 ## Working by hand
 
 - Everything runs through Docker (`make check|test|lint|fmt|vet|build|run`), nothing to install on your machine.
