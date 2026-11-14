@@ -66,6 +66,7 @@ brews:
       owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
     homepage: https://github.com/{{ .Env.GITHUB_REPOSITORY_OWNER }}/cloudssh
     description: k9s-style terminal UI to browse cloud resources and SSH into them
     license: MIT
