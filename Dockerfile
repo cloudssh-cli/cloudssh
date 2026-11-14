@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- dev: toolchain used by `make` targets and CI parity (nothing installed on host)
-FROM golang:1.26-bookworm AS dev
+FROM golang:1.27-bookworm AS dev
 RUN apt-get update && apt-get install -y --no-install-recommends openssh-client make git \
   && rm -rf /var/lib/apt/lists/*
 ARG GOLANGCI_LINT_VERSION=v2.6.0
