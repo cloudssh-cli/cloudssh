@@ -2,6 +2,10 @@
 
 k9s-style terminal UI (Go, Bubble Tea) to browse cloud resources (AWS first) and SSH into them.
 
+## Contributing in one minute
+- `make check` runs everything CI runs, in Docker (nothing to install). `./bin/cloudssh --demo` runs the app on sample data with no cloud account.
+- Ask your assistant in plain words ("add GCP", "filter instances by launch template"); the skills below hold the step-by-step guides. Humans: see CONTRIBUTING.md.
+
 ## Layout
 - `cmd/cloudssh` – entrypoint only
 - `internal/cli` – cobra root command, flag/config wiring
@@ -18,9 +22,9 @@ k9s-style terminal UI (Go, Bubble Tea) to browse cloud resources (AWS first) and
 - **No ctrl-key chords in the UI;** dialogs are tab/arrow driven (`.claude/skills/ui-keybindings`).
 - **All tooling runs in Docker** (`make test|lint|fmt|vet|check|run`). Don't install toolchains on the host.
 - Every package ships tests (`*_test.go`); new behaviour needs a test in the same commit. UI tests use a fake provider, AWS tests test pure mapping funcs; real-AWS tests carry `//go:build integration`.
-- **Always leave a fresh build.** After finishing any code change, run `make check` and then `make build`, so `./bin/cloudssh` is built from the latest code whenever the user tries it. A Stop hook (`.claude/hooks/ensure-build.sh`) enforces this: it rebuilds when sources are newer than the binary and blocks finishing if the build fails. The target platform comes from `local.mk`/env (see README "Build target"), never from tracked files.
+- **Verify before you hand over.** `make check` must pass (fmt, vet, lint, race tests, conformance and e2e). Run `make build` and try `./bin/cloudssh --demo` when behaviour or UI changed. The target platform comes from `local.mk`/env (README "Build target"), never from tracked files. An optional Stop hook that keeps `./bin/cloudssh` fresh lives in `.claude/hooks/` (opt in via your own `.claude/settings.local.json`; see CONTRIBUTING).
 - **Never commit or push to `main`.** Work on a branch (`feat/…`, `fix/…`, `chore/…`), push the branch and open a pull request; `main` only changes by merging a PR (squash, PR title = Conventional Commit). Never push unless asked, and never force-push shared branches.
 - **Small logical commits**, Conventional Commits (`feat(ec2): …`, `fix(ui): …`, `ci: …`). No `Co-Authored-By` trailers.
-- Releases: automated by release-please. Merges to `main` keep a Release PR (next semver + changelog from Conventional Commits) up to date; merging it tags and runs `.github/workflows/release.yml`, where GoReleaser attaches linux/darwin x amd64/arm64 archives + checksums to the GitHub Release and updates the Homebrew tap (`cloudssh-cli/homebrew-tap`, token `HOMEBREW_TAP_TOKEN`). Commit types decide the bump (`feat` minor, `fix` patch, `!`/BREAKING major). Never tag by hand; `scripts/install.sh` is the curl installer. CI (`ci.yml`) is still parked (manual workflow only).
-- Secrets used in CI: `AWS_ROLE_ARN` (OIDC, integration tests), `HOMEBREW_TAP_TOKEN` (release; PAT with contents:write on the tap repo). Never commit credentials or `.pem` files.
+- Releases are maintainer-only and automated by release-please: merged PRs accumulate in a Release PR (next semver + changelog from Conventional Commits `feat` minor, `fix` patch, `!`/`BREAKING CHANGE` major); merging it tags and `.github/workflows/release.yml` publishes binaries, the signed `checksums.txt` and the Homebrew formula via GoReleaser. Contributors never tag or edit versions or `CHANGELOG.md`.
+- Never commit credentials, `.pem` or `.env` files. CI secrets (`AWS_ROLE_ARN` for integration tests, `HOMEBREW_TAP_TOKEN` for releases) are maintainer-managed and never needed to contribute.
 - Adding a cloud/resource: see `.claude/skills/add-resource`. Other skills: `add-cloud` (new cloud), `demo-data` (sample data, no drift), `add-filter`, `ui-keybindings`, `tui-preview` (render screens as text), `ship-changes` (commit/push flow).

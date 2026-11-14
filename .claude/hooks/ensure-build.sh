@@ -1,6 +1,8 @@
 #!/bin/sh
-# Stop hook: keep ./bin/cloudssh current so whatever the user runs after a
-# session is built from the latest code. It rebuilds only when a Go source (or
+# OPTIONAL Stop hook (not enabled by default): keeps ./bin/cloudssh current so
+# what you run after an assistant session is built from the latest code. To
+# enable it, register it under "hooks" > "Stop" in your own, gitignored
+# .claude/settings.local.json (see CONTRIBUTING.md). It rebuilds only when a Go source (or
 # go.mod/go.sum) is newer than the binary, so idle turns cost nothing.
 #
 # A failing build exits 2: Claude Code then hands the output back to Claude,

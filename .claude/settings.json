@@ -5,8 +5,7 @@
       "Bash(docker compose:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
-      "Bash(git log:*)",
-      "Bash(git push:*)"
+      "Bash(git log:*)"
     ],
     "deny": [
       "Read(./pems/**)",
@@ -21,20 +20,6 @@
       "Read(~/.aws/credentials)",
       "Read(~/.aws/sso/**)",
       "Read(~/.aws/cli/cache/**)"
-    ]
-  },
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ensure-build.sh",
-            "timeout": 600,
-            "statusMessage": "Keeping ./bin/cloudssh up to date..."
-          }
-        ]
-      }
     ]
   }
 }
