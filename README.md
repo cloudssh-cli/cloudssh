@@ -12,6 +12,8 @@ SSH is the real `ssh` binary: cloudssh suspends its UI, hands your terminal to `
 
 ## Install
 
+**Supported platforms:** macOS and Linux (amd64 and arm64). Windows is not supported natively (cloudssh relies on a Unix `ssh`, `sh` and file permissions); on Windows, run it inside [WSL](https://learn.microsoft.com/windows/wsl/) using the Linux build.
+
 Homebrew (macOS and Linux), once the tap is published:
 
 ```sh
