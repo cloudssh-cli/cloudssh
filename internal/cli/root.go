@@ -14,12 +14,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/cloud"
-	"github.com/SVMadhavaReddy/cloudssh/internal/config"
-	"github.com/SVMadhavaReddy/cloudssh/internal/logx"
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
-	"github.com/SVMadhavaReddy/cloudssh/internal/ui"
-	"github.com/SVMadhavaReddy/cloudssh/internal/version"
+	"github.com/cloudssh-cli/cloudssh/internal/cloud"
+	"github.com/cloudssh-cli/cloudssh/internal/config"
+	"github.com/cloudssh-cli/cloudssh/internal/logx"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/ui"
+	"github.com/cloudssh-cli/cloudssh/internal/version"
 )
 
 // demoPageSize: with 100+ sample machines this is five pages, so even after the

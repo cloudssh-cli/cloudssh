@@ -12,9 +12,9 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/cloud"
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider/providertest"
+	"github.com/cloudssh-cli/cloudssh/internal/cloud"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider/providertest"
 )
 
 // The demo provider is checked by the shared suite every cloud must pass.

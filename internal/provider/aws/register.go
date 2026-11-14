@@ -1,6 +1,6 @@
 package aws
 
-import "github.com/SVMadhavaReddy/cloudssh/internal/cloud"
+import "github.com/cloudssh-cli/cloudssh/internal/cloud"
 
 // The AWS backend registers itself; the CLI only has to import this package.
 func init() {

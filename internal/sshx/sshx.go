@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/logx"
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/logx"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // Target is a resolved connection request.

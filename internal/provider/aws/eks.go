@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/eks/types"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // eksPageMax is EKS's List limit. Pages can be large because List returns names

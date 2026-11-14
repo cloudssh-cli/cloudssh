@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // profilesResource lists the sign-in profiles configured on this machine as

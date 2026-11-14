@@ -11,7 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/logx"
+	"github.com/cloudssh-cli/cloudssh/internal/logx"
 )
 
 const (

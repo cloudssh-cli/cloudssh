@@ -8,7 +8,7 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2instanceconnect"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // instanceConnect is the slice of the EC2 Instance Connect client we use.

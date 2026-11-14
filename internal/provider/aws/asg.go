@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 type asgs struct{ p *Provider }

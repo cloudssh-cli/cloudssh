@@ -1,4 +1,4 @@
-module github.com/SVMadhavaReddy/cloudssh
+module github.com/cloudssh-cli/cloudssh
 
 go 1.26.11
 

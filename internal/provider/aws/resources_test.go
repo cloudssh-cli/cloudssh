@@ -12,7 +12,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 func assertCells(t *testing.T, row provider.Row, res provider.Resource, want ...string) {

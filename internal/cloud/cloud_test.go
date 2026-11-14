@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 type stub struct{ opts provider.Options }

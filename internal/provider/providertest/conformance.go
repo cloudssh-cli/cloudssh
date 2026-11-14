@@ -13,7 +13,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // Options tell the suite what the provider's sample data must demonstrate.

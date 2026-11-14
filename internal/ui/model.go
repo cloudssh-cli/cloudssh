@@ -12,10 +12,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/config"
-	"github.com/SVMadhavaReddy/cloudssh/internal/logx"
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
-	"github.com/SVMadhavaReddy/cloudssh/internal/sshx"
+	"github.com/cloudssh-cli/cloudssh/internal/config"
+	"github.com/cloudssh-cli/cloudssh/internal/logx"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/sshx"
 )
 
 const (

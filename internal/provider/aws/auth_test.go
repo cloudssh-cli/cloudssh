@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 func TestExplainAuthErrorCases(t *testing.T) {

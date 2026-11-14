@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // demoState is set on a Provider running on built-in sample data.

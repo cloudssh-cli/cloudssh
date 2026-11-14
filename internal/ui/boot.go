@@ -5,8 +5,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/config"
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/config"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // bootDoneMsg carries the opened provider (or why it could not be opened).

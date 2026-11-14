@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/cli"
+	"github.com/cloudssh-cli/cloudssh/internal/cli"
 )
 
 func main() {

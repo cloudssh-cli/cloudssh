@@ -11,7 +11,7 @@ import (
 
 	"github.com/aws/smithy-go"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // Runs against a real account using the ambient AWS credentials (CI: OIDC role).

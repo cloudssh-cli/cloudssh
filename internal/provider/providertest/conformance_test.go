@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // recorder is a TB that collects failures instead of failing the real test.

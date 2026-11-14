@@ -12,7 +12,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // Demo data (cloudssh --demo). Everything here is made of the AWS SDK's own

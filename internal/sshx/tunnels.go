@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // LocalTunnel is a tunnel the user already runs, for example

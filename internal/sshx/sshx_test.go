@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 func TestResolvePrefersConfiguredIP(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 const psSample = `/sbin/launchd

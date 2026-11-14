@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // reservedKeys are shift+letter bindings with a fixed meaning.

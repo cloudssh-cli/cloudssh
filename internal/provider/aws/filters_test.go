@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 func TestBuildFiltersTurnsOrIntoAlternativesAndSkipsNegations(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // section is one [header] of an INI file with its key/value pairs.

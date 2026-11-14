@@ -15,10 +15,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/config"
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider/aws"
-	"github.com/SVMadhavaReddy/cloudssh/internal/ui"
+	"github.com/cloudssh-cli/cloudssh/internal/config"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider/aws"
+	"github.com/cloudssh-cli/cloudssh/internal/ui"
 )
 
 // ---- tiny harness (black box: only View() is inspected) ----

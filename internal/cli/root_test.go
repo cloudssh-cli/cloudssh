@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
-	awsprov "github.com/SVMadhavaReddy/cloudssh/internal/provider/aws"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
+	awsprov "github.com/cloudssh-cli/cloudssh/internal/provider/aws"
 )
 
 func run(t *testing.T, args ...string) (string, error) {

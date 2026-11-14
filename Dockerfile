@@ -19,7 +19,7 @@ COPY . .
 ARG VERSION=dev
 ENV CGO_ENABLED=0
 RUN go build -trimpath \
-  -ldflags "-s -w -X github.com/SVMadhavaReddy/cloudssh/internal/version.Version=${VERSION}" \
+  -ldflags "-s -w -X github.com/cloudssh-cli/cloudssh/internal/version.Version=${VERSION}" \
   -o /out/cloudssh ./cmd/cloudssh
 
 # ---- runtime: try cloudssh without installing anything (still needs ssh)

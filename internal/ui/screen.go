@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
-	"github.com/SVMadhavaReddy/cloudssh/internal/query"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/query"
 )
 
 // screen is one level of a mode's navigation stack: a resource, the filters

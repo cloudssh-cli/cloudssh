@@ -4,5 +4,5 @@ package cli
 // internal/cloud from its init(). To add a cloud, create
 // internal/provider/<name> (see .claude/skills/add-cloud) and add one line.
 import (
-	_ "github.com/SVMadhavaReddy/cloudssh/internal/provider/aws"
+	_ "github.com/cloudssh-cli/cloudssh/internal/provider/aws"
 )

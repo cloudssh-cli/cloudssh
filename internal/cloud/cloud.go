@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SVMadhavaReddy/cloudssh/internal/provider"
+	"github.com/cloudssh-cli/cloudssh/internal/provider"
 )
 
 // Factory builds a ready-to-use provider. It must not fail merely because the
