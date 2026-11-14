@@ -1,6 +1,12 @@
 # cloudssh
 
+[![CI](https://github.com/cloudssh-cli/cloudssh/actions/workflows/ci.yml/badge.svg)](https://github.com/cloudssh-cli/cloudssh/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/cloudssh-cli/cloudssh)](https://github.com/cloudssh-cli/cloudssh/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A [k9s](https://k9scli.io)-style terminal UI for browsing cloud resources and SSHing into them. AWS today: EC2 instances, ECS (clusters → services → tasks), EKS (clusters → node groups), Auto Scaling Groups and VPCs (→ subnets). Other clouds are on the roadmap.
+
+![cloudssh demo](docs/demo.gif)
 
 SSH is the real `ssh` binary: cloudssh suspends its UI, hands your terminal to `ssh`, and resumes when you exit, so `~/.ssh/config`, agents and ProxyJump all work.
 
@@ -26,6 +32,20 @@ Build and run from source via Docker:
 make build   # ./bin/cloudssh; linux by default, see "Build target" below
 make run     # run the TUI in a container
 ```
+
+### Verify your download
+
+Each release's `checksums.txt` is signed with [cosign](https://github.com/sigstore/cosign) (keyless, via GitHub Actions) and every archive has an SBOM. To verify:
+
+```sh
+cosign verify-blob checksums.txt \
+  --certificate checksums.txt.pem --signature checksums.txt.sig \
+  --certificate-identity-regexp 'https://github.com/cloudssh-cli/cloudssh/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+sha256sum --check --ignore-missing checksums.txt
+```
+
+The install script and Homebrew verify checksums for you.
 
 ## Try it without an account
 
@@ -65,6 +85,8 @@ Start on a specific screen with `--view dashboard|ec2|ecs|eks|asg|vpc`. Press `?
 | `p` | profiles: switch the sign-in profile at any time (`enter` uses it, `esc` goes back) |
 | `?` | help |
 | `q` | quit |
+
+cloudssh only needs read access to your cloud account: see [docs/iam.md](docs/iam.md) for the exact IAM policy.
 
 ## Searching and filtering
 
