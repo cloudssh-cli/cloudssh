@@ -27,4 +27,4 @@ Every guide ends the same way, so a change is safe to merge without a maintainer
 
 ## Updating the demo GIF
 
-The GIF at the top of the README is recorded from the built-in demo data, so it needs no cloud account and is reproducible. After a visible UI change, run `make demo-gif`. The only requirement is Docker: [VHS](https://github.com/charmbracelet/vhs) runs from its container image. The script is `docs/demo.tape` (plain text: keystrokes and pauses); edit it to change what the GIF shows, and keep the result under about 3 MB. Commit both as `docs: refresh demo gif`.
+The GIF at the top of the README is recorded from the built-in demo data, so it needs no cloud account and is reproducible. After a visible UI change, run `make demo-gif`. The only requirement is Docker: [VHS](https://github.com/charmbracelet/vhs) runs from its container image. The script is `docs/demo.tape` (plain text: keystrokes and pauses); edit it to change what the GIF shows, and `make demo-gif` also shrinks it (gifsicle, roughly 0.7 MB); keep it under about 1 MB. Commit both as `docs: refresh demo gif`.

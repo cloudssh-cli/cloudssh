@@ -38,3 +38,4 @@ shell: ## shell in the dev container
 demo-gif: ## re-record docs/demo.gif from the demo data (VHS in Docker)
 	$(RUN) env CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o bin/linux/cloudssh ./cmd/cloudssh
 	docker run --rm -v "$(CURDIR)":/vhs -w /vhs ghcr.io/charmbracelet/vhs docs/demo.tape
+	docker run --rm -v "$(CURDIR)":/w -w /w alpine sh -c 'apk add -q gifsicle && gifsicle -b -O3 --colors 48 --lossy=25 docs/demo.gif'
