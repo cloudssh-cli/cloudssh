@@ -11,7 +11,7 @@ Every guide ends the same way, so a change is safe to merge without a maintainer
 
 1. `make check` passes (fmt, vet, golangci-lint, race tests). This includes the **conformance suite** (`internal/provider/providertest`) that checks any cloud against the contract, the demo-data consistency tests, and the end-to-end tests in `internal/e2e` that drive the real UI over `--demo` data.
 2. `make build`, then try it: `./bin/cloudssh --demo` (no cloud account needed; ssh opens a harmless local shell).
-3. Small logical commits in [Conventional Commits](https://www.conventionalcommits.org) style (`feat(gcp): ...`, `fix(ui): ...`); tests ship in the same commit as the behaviour.
+3. Work on a branch and open a pull request; `main` is only changed by merged PRs. Use small logical commits in [Conventional Commits](https://www.conventionalcommits.org) style (`feat(gcp): ...`, `fix(ui): ...`); tests ship in the same commit as the behaviour.
 
 ## Working by hand
 
