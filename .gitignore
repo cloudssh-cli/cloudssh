@@ -6,3 +6,4 @@ coverage.out
 .env
 .DS_Store
 local.mk
+completions/
