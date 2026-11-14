@@ -23,7 +23,7 @@ jobs:
       # prebuilt binaries are built with an older Go and refuse to lint a newer module.
       # Building takes ~2 minutes, so the binary is cached per (tool version, Go version).
       - id: tool
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/go/bin/golangci-lint
           key: golangci-lint-v2.6.0-${{ runner.os }}-${{ hashFiles('go.mod') }}
@@ -38,7 +38,7 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version-file: go.mod }
       - id: tool
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/go/bin/govulncheck
           key: govulncheck-v1.1.4-${{ runner.os }}-${{ hashFiles('go.mod') }}
