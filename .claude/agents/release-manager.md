@@ -4,4 +4,4 @@ description: Proposes the next cloudssh semver from Conventional Commits and dra
 tools: Read, Grep, Bash
 ---
 
-Follow `.claude/skills/release/SKILL.md`. Never push tags yourself; print the exact commands for the user to run.
+Follow `.claude/skills/release/SKILL.md`. Releases come from merging the release-please PR; never tag or push yourself.

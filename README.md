@@ -9,7 +9,13 @@ SSH is the real `ssh` binary: cloudssh suspends its UI, hands your terminal to `
 Homebrew (macOS and Linux), once the tap is published:
 
 ```sh
-brew install <owner>/tap/cloudssh
+brew install cloudssh-cli/tap/cloudssh
+```
+
+Or the install script (macOS/Linux, verifies the checksum, no sudo needed):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/cloudssh-cli/cloudssh/main/scripts/install.sh | sh
 ```
 
 Or download a binary for your OS/arch from the GitHub Releases page and put it on your `PATH`. Verify with `checksums.txt`.
