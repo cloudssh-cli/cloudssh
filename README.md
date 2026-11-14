@@ -6,9 +6,9 @@
 
 A [k9s](https://k9scli.io)-style terminal UI for browsing cloud resources and SSHing into them. AWS today: EC2 instances, ECS (clusters → services → tasks), EKS (clusters → node groups), Auto Scaling Groups and VPCs (→ subnets). Other clouds are on the roadmap.
 
-![cloudssh demo](docs/demo.gif)
-
 SSH is the real `ssh` binary: cloudssh suspends its UI, hands your terminal to `ssh`, and resumes when you exit, so `~/.ssh/config`, agents and ProxyJump all work.
+
+![cloudssh demo](docs/demo.gif)
 
 ## Install
 
