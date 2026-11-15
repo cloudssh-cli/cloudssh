@@ -196,7 +196,7 @@ func (m Model) Init() tea.Cmd {
 		if m.splashHeld {
 			hold = splashStep
 		}
-		cmds = append(cmds, tea.Tick(hold, func(time.Time) tea.Msg { return splashMsg{1} }))
+		cmds = append(cmds, tick(hold, func(time.Time) tea.Msg { return splashMsg{1} }))
 	}
 	return tea.Batch(cmds...)
 }
@@ -246,7 +246,7 @@ func (m *Model) setStatus(s string) tea.Cmd {
 		return nil
 	}
 	seq := m.statusSeq
-	return tea.Tick(statusTTL, func(time.Time) tea.Msg { return clearStatusMsg{seq} })
+	return tick(statusTTL, func(time.Time) tea.Msg { return clearStatusMsg{seq} })
 }
 
 func (m *Model) pushHistory(s string) {
@@ -383,7 +383,7 @@ func (m Model) prefetchTick(s *screen) tea.Cmd {
 		return nil
 	}
 	sid, gen := s.id, s.gen
-	return tea.Tick(time.Duration(m.cfg.PrefetchDelayMs)*time.Millisecond, func(time.Time) tea.Msg { return prefetchMsg{sid, gen} })
+	return tick(time.Duration(m.cfg.PrefetchDelayMs)*time.Millisecond, func(time.Time) tea.Msg { return prefetchMsg{sid, gen} })
 }
 
 // maxEnrichInFlight bounds concurrent detail requests, so scrolling a long
@@ -430,7 +430,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// the loading indicator animates only while a first load is on screen
 	if sc := nm.cur(); sc != nil && sc.loading && len(sc.rows) == 0 && !nm.spinning {
 		nm.spinning = true
-		cmd = tea.Batch(cmd, tea.Tick(spinEvery, func(time.Time) tea.Msg { return spinMsg{} }))
+		cmd = tea.Batch(cmd, tick(spinEvery, func(time.Time) tea.Msg { return spinMsg{} }))
 	}
 	return nm, cmd
 }
@@ -451,7 +451,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.splashAt = msg.step
-		return m, tea.Tick(splashStep, func(time.Time) tea.Msg { return splashMsg{msg.step + 1} })
+		return m, tick(splashStep, func(time.Time) tea.Msg { return splashMsg{msg.step + 1} })
 
 	case spinMsg:
 		m.spinning = false // Update re-arms the tick while the first load is still running
@@ -1176,3 +1176,12 @@ func (m Model) View() string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// tick schedules a timer message. It is a variable so end-to-end tests can
+// replace real timers with deterministic ones (see SetTick).
+var tick = tea.Tick
+
+// SetTick replaces the timer used for splash steps, spinners, status expiry and
+// prefetch delays. Tests use it to avoid depending on wall-clock time; call it
+// once before building a Model. Not for production use.
+func SetTick(f func(d time.Duration, fn func(time.Time) tea.Msg) tea.Cmd) { tick = f }

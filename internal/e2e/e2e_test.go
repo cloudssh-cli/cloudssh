@@ -7,6 +7,7 @@ package e2e
 
 import (
 	"context"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -41,7 +42,26 @@ func keyMsg(s string) tea.KeyMsg {
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 }
 
-// run executes cmd, flattening batches and skipping slow timer commands.
+// TestMain replaces the UI's real timers: a timer that would fire within
+// instantTimer fires at once, longer ones never fire (they were skipped before
+// anyway). run can then wait generously for real commands without guessing
+// which commands are timers, which made slow CI runners flaky.
+func TestMain(m *testing.M) {
+	ui.SetTick(func(d time.Duration, fn func(time.Time) tea.Msg) tea.Cmd {
+		if d > instantTimer {
+			return func() tea.Msg { return nil }
+		}
+		return func() tea.Msg { return fn(time.Time{}) }
+	})
+	os.Exit(m.Run())
+}
+
+const (
+	instantTimer = 50 * time.Millisecond
+	cmdTimeout   = 10 * time.Second
+)
+
+// run executes cmd and flattens batches.
 func run(cmd tea.Cmd) []tea.Msg {
 	if cmd == nil {
 		return nil
@@ -58,7 +78,7 @@ func run(cmd tea.Cmd) []tea.Msg {
 			return out
 		}
 		return []tea.Msg{msg}
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(cmdTimeout):
 		return nil
 	}
 }
