@@ -56,7 +56,7 @@ func (b Boot) Init() tea.Cmd {
 		return bootDoneMsg{p, err}
 	}}
 	if !b.held {
-		cmds = append(cmds, tea.Tick(splashHold, func(time.Time) tea.Msg { return bootHeldMsg{} }))
+		cmds = append(cmds, tick(splashHold, func(time.Time) tea.Msg { return bootHeldMsg{} }))
 	}
 	return tea.Batch(cmds...)
 }
@@ -84,7 +84,7 @@ func (b Boot) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if b.ready != nil && b.ready.err == nil && b.held && !b.shown && !b.armed {
 		b.armed = true // let "signed in" be read before the fade
-		return b, tea.Tick(bootShown, func(time.Time) tea.Msg { return bootShownMsg{} })
+		return b, tick(bootShown, func(time.Time) tea.Msg { return bootShownMsg{} })
 	}
 	return b.maybeStart()
 }
