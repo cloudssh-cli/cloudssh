@@ -12,7 +12,7 @@ k9s-style terminal UI (Go, Bubble Tea) to browse cloud resources (AWS first) and
 - `internal/config` – YAML config + defaults
 - `internal/provider` – cloud-agnostic contract (`Provider`, `Resource`, optional `Drillable`/`HostResolver`/`Authenticator`/`Authorizer`/`Demoer`); `provider/aws` is the AWS impl; `provider/providertest` is the conformance suite every cloud must pass
 - `internal/cloud` – registry of cloud factories; each `provider/<cloud>` registers itself from `init()`, `internal/cli/clouds.go` imports them
-- `internal/e2e` – drives the real UI over the demo data (`cloudssh --demo`)
+- `internal/e2e` – drives the real UI over the demo data (`cloudssh --demo`). Its `TestMain` swaps the UI's timers (`ui.SetTick`) for deterministic ones; new UI timers must go through `tick(...)` in `internal/ui`, never `tea.Tick`, or e2e tests turn flaky on slow CI runners
 - `internal/ui` – Bubble Tea model; depends only on provider interfaces
 - `internal/sshx` – builds `ssh` invocations; the TUI suspends (`tea.ExecProcess`) and execs system `ssh`. Never embed a terminal emulator.
 
