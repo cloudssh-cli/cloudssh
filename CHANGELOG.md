@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/cloudssh-cli/cloudssh/compare/v0.1.1...v0.1.2) (2026-11-15)
+
+
+### Features
+
+* **config:** name the default ssh method after the cloud's service (instance-connect) ([#41](https://github.com/cloudssh-cli/cloudssh/issues/41)) ([7873ba7](https://github.com/cloudssh-cli/cloudssh/commit/7873ba7570d2b06fb0b447b6afef6d37b26909b1))
+
+
+### Fixes
+
+* **deps:** bump the go-deps group with 2 updates ([#39](https://github.com/cloudssh-cli/cloudssh/issues/39)) ([78390a1](https://github.com/cloudssh-cli/cloudssh/commit/78390a17ab5fc817d1a09608a20fbac29020d19d))
+
 ## [0.1.1](https://github.com/cloudssh-cli/cloudssh/compare/v0.1.0...v0.1.1) (2026-11-15)
 
 A maintenance release: dependency updates, a tidier Homebrew tap and supply-chain hardening. There are no changes to cloudssh's features. Upgrade with `brew upgrade cloudssh`, or run the install script again.
