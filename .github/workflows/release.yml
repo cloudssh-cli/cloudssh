@@ -47,7 +47,7 @@ jobs:
         with: { go-version-file: go.mod }
       - run: go test -count=1 ./...
       - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
-      - uses: anchore/sbom-action/download-syft@da167eac915b4e86f08b264dbdbc867b61be6f0c # v0.20.5
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
       - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
         with:
           version: "~> v2"
