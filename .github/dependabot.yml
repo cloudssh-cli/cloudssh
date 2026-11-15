@@ -16,8 +16,12 @@ updates:
     schedule: { interval: weekly }
     commit-message: { prefix: "ci(deps)" }
     groups:
+      # every github/codeql-action step must run the same version
+      codeql-action:
+        patterns: ["github/codeql-action*"]
       actions:
         update-types: [minor, patch]
+        exclude-patterns: ["github/codeql-action*"]
   - package-ecosystem: docker
     directory: /
     schedule: { interval: weekly }
