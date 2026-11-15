@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/cloudssh-cli/cloudssh/compare/v0.1.2...v0.1.3) (2026-11-15)
+
+
+### Fixes
+
+* **release:** sign checksums as a cosign v3 bundle ([#43](https://github.com/cloudssh-cli/cloudssh/issues/43)) ([b88d7cc](https://github.com/cloudssh-cli/cloudssh/commit/b88d7cc486e99cfa7a9b98c79a57a3fe687d1236))
+
 ## [0.1.2](https://github.com/cloudssh-cli/cloudssh/compare/v0.1.1...v0.1.2) (2026-11-15)
 
 A small release: a clearer way to make EC2 Instance Connect your default, plus dependency and CI updates. No breaking changes.
