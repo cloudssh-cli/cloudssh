@@ -300,6 +300,7 @@ type fakeAuthProvider struct {
 }
 
 func (*fakeAuthProvider) AuthLabel() string { return "Fake Connect" }
+func (*fakeAuthProvider) AuthName() string  { return "fake-connect" }
 func (f *fakeAuthProvider) AuthorizeSSH(_ context.Context, h provider.Host, user, pub string) error {
 	f.got, f.user, f.key = h, user, pub
 	return f.err
@@ -342,14 +343,20 @@ func TestSSHDialogOffersMethodOnlyWhenProviderSupportsIt(t *testing.T) {
 
 func TestConfigCanDefaultToTheTemporaryKey(t *testing.T) {
 	cfg := testCfg()
-	cfg.SSHMethod = config.SSHMethodTemporaryKey
-	m := authModel(t, cfg, &fakeAuthProvider{})
-	if !m.modal.(*sshModal).viaAuth || !strings.Contains(m.View(), "-i <Fake Connect>") {
-		t.Fatal("ssh_method: temporary-key should preselect the temporary key")
+	for _, name := range []string{"fake-connect", config.LegacySSHMethodTemporaryKey} {
+		cfg.SSHMethod = name
+		m := authModel(t, cfg, &fakeAuthProvider{})
+		if !m.modal.(*sshModal).viaAuth || !strings.Contains(m.View(), "-i <Fake Connect>") {
+			t.Fatalf("ssh_method: %s should preselect the temporary key", name)
+		}
+	}
+	cfg.SSHMethod = "ssh"
+	if authModel(t, cfg, &fakeAuthProvider{}).modal.(*sshModal).viaAuth {
+		t.Fatal("ssh_method: ssh must not preselect it")
 	}
 	// but a provider without the capability falls back to plain ssh
 	plain := loaded(t, threeRows())
-	plain.cfg.SSHMethod = config.SSHMethodTemporaryKey
+	plain.cfg.SSHMethod = "fake-connect"
 	plain, _ = send(plain, resolvedMsg{host: provider.Host{PrivateIP: "10.0.0.1"}})
 	if plain.modal.(*sshModal).viaAuth {
 		t.Fatal("must not select a method the provider lacks")

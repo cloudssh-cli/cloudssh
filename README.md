@@ -149,7 +149,7 @@ profile: default
 region: us-east-1
 pem_files_path: ~/.cloudssh/pems   # <key-pair-name>.pem is passed with -i (alone, IdentitiesOnly) when present; a too-open (not 600) key is flagged in the ssh dialog; when the .pem is missing the dialog asks for a key file and will not connect without one (or use the temporary-key method)
 default_ip_type: private           # or public
-ssh_method: ssh                    # or temporary-key (a short-lived key pushed through the cloud, e.g. EC2 Instance Connect)
+ssh_method: ssh                    # or instance-connect on AWS: preselect EC2 Instance Connect (no key pair) so you need not pick it on every connect; also --ssh-method
 page_size: 100                     # rows per page (AWS allows up to 1000 for EC2/VPC, 100 for Auto Scaling; EKS is capped lower)
 prefetch_pages: 3                  # pages loaded in the background after the first
 search_prefetch_pages: 10          # extra pages loaded when you open search
@@ -163,7 +163,7 @@ theme: auto                        # auto (follows the terminal, dark if unknown
 
 ## EC2 Instance Connect
 
-No key pair needed: in the SSH dialog move to *Method* with `tab` and press `→` (or set `ssh_method: temporary-key` / `--ssh-method temporary-key`). cloudssh generates a throwaway ed25519 key with `ssh-keygen`, pushes the public half to the instance with `SendSSHPublicKey` (valid for about 60 seconds), runs your system `ssh` with only that key, and deletes it when the session ends. No AWS CLI is needed.
+No key pair needed: in the SSH dialog move to *Method* with `tab` and press `→` (or make it the default with `ssh_method: instance-connect` in the config file, or `--ssh-method instance-connect`; the older value `temporary-key` still works). cloudssh generates a throwaway ed25519 key with `ssh-keygen`, pushes the public half to the instance with `SendSSHPublicKey` (valid for about 60 seconds), runs your system `ssh` with only that key, and deletes it when the session ends. No AWS CLI is needed.
 
 Requirements: the IAM permission `ec2-instance-connect:SendSSHPublicKey`, an AMI with Instance Connect installed (Amazon Linux 2/2023, Ubuntu 20.04+), port 22 reachable from your machine, and the right user (the dialog pre-fills the AMI's default). Private-only instances need a network path (VPN, bastion); EC2 Instance Connect Endpoint tunnels are not supported yet.
 

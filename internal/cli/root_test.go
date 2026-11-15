@@ -92,3 +92,16 @@ func TestEffectivePageSize(t *testing.T) {
 		}
 	}
 }
+
+func TestSSHMethodIsCheckedAgainstTheCloud(t *testing.T) {
+	aws := awsprov.NewDemo(10)
+	for _, ok := range []string{"ssh", "instance-connect", "temporary-key"} {
+		if err := validateSSHMethod(ok, aws); err != nil {
+			t.Errorf("%q should be accepted: %v", ok, err)
+		}
+	}
+	err := validateSSHMethod("telnet", aws)
+	if err == nil || !strings.Contains(err.Error(), "instance-connect") {
+		t.Fatalf("a typo must be rejected and name the valid choice, got %v", err)
+	}
+}

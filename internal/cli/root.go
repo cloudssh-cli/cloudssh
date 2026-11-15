@@ -65,10 +65,7 @@ func NewRootCmd() *cobra.Command {
 				cfg.View = view
 			}
 			if ssh != "" {
-				if !config.ValidSSHMethod(ssh) {
-					return fmt.Errorf("--ssh-method must be %q or %q, got %q", config.SSHMethodSSH, config.SSHMethodTemporaryKey, ssh)
-				}
-				cfg.SSHMethod = ssh
+				cfg.SSHMethod = strings.ToLower(strings.TrimSpace(ssh))
 			}
 			if pems != "" {
 				cfg.PemFilesPath = pems
@@ -108,6 +105,9 @@ func NewRootCmd() *cobra.Command {
 				if err == nil {
 					err = validateView(cfg.View, prov)
 				}
+				if err == nil {
+					err = validateSSHMethod(cfg.SSHMethod, prov)
+				}
 				logx.L().Info("provider opened", "took", time.Since(began).Round(time.Millisecond), "err", err)
 				return prov, err
 			}
@@ -130,7 +130,7 @@ func NewRootCmd() *cobra.Command {
 	f.StringVar(&profile, "profile", "", "sign-in profile (what a profile means depends on the cloud)")
 	f.StringVar(&region, "region", "", "region (cloud specific)")
 	f.BoolVar(&demo, "demo", false, "run on built-in sample data: no cloud account or network needed, ssh opens a harmless local shell")
-	f.StringVar(&ssh, "ssh-method", "", fmt.Sprintf("default connection method: %q (your keys) or %q (a short-lived key pushed through the cloud, when offered)", config.SSHMethodSSH, config.SSHMethodTemporaryKey))
+	f.StringVar(&ssh, "ssh-method", "", "default connection method: \"ssh\" (your keys) or the name of the cloud's short-lived-key service (see the README)")
 	f.StringVar(&logFile, "log-file", "", "write a debug log (sign-in timing, errors, ssh commands) to this file; also $CLOUDSSH_LOG or log_file in the config")
 	f.BoolVar(&logDebug, "debug", false, "log more detail (with --log-file)")
 	f.StringVar(&pems, "pem-files-path", "", "directory holding <key-pair-name>.pem files")
@@ -166,4 +166,14 @@ func effectivePageSize(flag int, demo bool, configured int32) int32 {
 		return demoPageSize
 	}
 	return configured
+}
+
+// validateSSHMethod rejects an ssh_method the cloud does not offer. A cloud
+// without a temporary-key service takes any value and uses plain ssh.
+func validateSSHMethod(method string, prov provider.Provider) error {
+	auth, ok := prov.(provider.Authorizer)
+	if !ok || method == config.SSHMethodSSH || method == config.LegacySSHMethodTemporaryKey || method == auth.AuthName() {
+		return nil
+	}
+	return fmt.Errorf("ssh_method %q is not offered by this cloud: use %q or %q", method, config.SSHMethodSSH, auth.AuthName())
 }

@@ -142,6 +142,9 @@ type HostResolver interface {
 type Authorizer interface {
 	// AuthLabel names the mechanism in the UI, e.g. "EC2 Instance Connect" on AWS.
 	AuthLabel() string
+	// AuthName is the value of the ssh_method setting that selects it, a short
+	// lower-case word such as "instance-connect" on AWS.
+	AuthName() string
 	AuthorizeSSH(ctx context.Context, h Host, user, publicKey string) error
 }
 
