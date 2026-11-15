@@ -21,6 +21,9 @@ var _ provider.Authorizer = (*Provider)(nil)
 
 func (*Provider) AuthLabel() string { return "EC2 Instance Connect" }
 
+// AuthName is what ssh_method: takes to default to EC2 Instance Connect.
+func (*Provider) AuthName() string { return "instance-connect" }
+
 // AuthorizeSSH pushes publicKey to the instance for user. The key is valid for
 // about 60 seconds, so connect right after. Needs ec2-instance-connect:SendSSHPublicKey.
 func (p *Provider) AuthorizeSSH(ctx context.Context, h provider.Host, user, publicKey string) error {

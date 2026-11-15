@@ -60,18 +60,18 @@ func TestSSHMethodDefaultAndValidation(t *testing.T) {
 	}
 	dir := t.TempDir()
 	good := filepath.Join(dir, "good.yaml")
-	if err := os.WriteFile(good, []byte("ssh_method: temporary-key\n"), 0o600); err != nil {
+	if err := os.WriteFile(good, []byte("ssh_method: \" Instance-Connect \"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if cfg, err := Load(good, true); err != nil || cfg.SSHMethod != SSHMethodTemporaryKey {
-		t.Fatalf("good: %+v %v", cfg, err)
+	if cfg, err := Load(good, true); err != nil || cfg.SSHMethod != "instance-connect" {
+		t.Fatalf("value is trimmed and lower-cased: %+v %v", cfg, err)
 	}
-	bad := filepath.Join(dir, "bad.yaml")
-	if err := os.WriteFile(bad, []byte("ssh_method: telnet\n"), 0o600); err != nil {
+	empty := filepath.Join(dir, "empty.yaml")
+	if err := os.WriteFile(empty, []byte("ssh_method: \"\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Load(bad, true); err == nil {
-		t.Fatal("unknown ssh_method must be rejected")
+	if cfg, err := Load(empty, true); err != nil || cfg.SSHMethod != SSHMethodSSH {
+		t.Fatalf("empty means ssh: %+v %v", cfg, err)
 	}
 }
 

@@ -128,7 +128,7 @@ func newSSHModal(h provider.Host, cfg config.Config, auth provider.Authorizer, t
 		host:    h, user: in, both: h.PrivateIP != "" && h.PublicIP != "",
 		pemDir:  config.ExpandHome(cfg.PemFilesPath),
 		auth:    auth,
-		viaAuth: auth != nil && cfg.SSHMethod == config.SSHMethodTemporaryKey,
+		viaAuth: auth != nil && (cfg.SSHMethod == auth.AuthName() || cfg.SSHMethod == config.LegacySSHMethodTemporaryKey),
 		tunnels: tunnels,
 	}
 	if requireKey && h.KeyName != "" && sm.pemDir != "" {

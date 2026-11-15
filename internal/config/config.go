@@ -6,18 +6,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
-// The values ssh_method / --ssh-method accept.
-const (
-	SSHMethodSSH          = "ssh"
-	SSHMethodTemporaryKey = "temporary-key"
-)
+// SSHMethodSSH is the ssh_method / --ssh-method value for "use my own keys".
+// Any other value names a method the chosen cloud offers (provider.Authorizer's
+// AuthName, e.g. "instance-connect" on AWS); the cloud validates it.
+const SSHMethodSSH = "ssh"
 
-// ValidSSHMethod reports whether s is an accepted ssh_method value.
-func ValidSSHMethod(s string) bool { return s == SSHMethodSSH || s == SSHMethodTemporaryKey }
+// LegacySSHMethodTemporaryKey is the cloud-neutral spelling shipped in 0.1.x;
+// it still selects the cloud's temporary-key method.
+const LegacySSHMethodTemporaryKey = "temporary-key"
 
 type Config struct {
 	Cloud        string `yaml:"cloud"`
@@ -40,9 +41,9 @@ type Config struct {
 	// errors, the ssh commands run). Empty = no log. LogDebug adds detail.
 	LogFile  string `yaml:"log_file"`
 	LogDebug bool   `yaml:"log_debug"`
-	// SSHMethod is the default connection method: SSHMethodSSH (your keys) or
-	// SSHMethodTemporaryKey (a short-lived key pushed through the cloud's own
-	// service, when the cloud offers one).
+	// SSHMethod is the default connection method: SSHMethodSSH (your keys) or the
+	// name of the cloud's short-lived-key service (e.g. "instance-connect" on
+	// AWS), when the cloud offers one.
 	SSHMethod string `yaml:"ssh_method"`
 	// Theme is "auto" (follow the terminal's light/dark background, dark when
 	// it cannot tell) or the name of a built-in theme.
@@ -108,8 +109,9 @@ func Load(path string, explicit bool) (Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
 	}
-	if !ValidSSHMethod(cfg.SSHMethod) {
-		return cfg, fmt.Errorf("ssh_method %q must be %q or %q", cfg.SSHMethod, SSHMethodSSH, SSHMethodTemporaryKey)
+	cfg.SSHMethod = strings.ToLower(strings.TrimSpace(cfg.SSHMethod))
+	if cfg.SSHMethod == "" {
+		cfg.SSHMethod = SSHMethodSSH
 	}
 	cfg.Prefetch, cfg.SearchPrefetch, cfg.PrefetchDelayMs = max(cfg.Prefetch, 0), max(cfg.SearchPrefetch, 0), max(cfg.PrefetchDelayMs, 0)
 	if cfg.PageSize < 5 {
