@@ -41,8 +41,7 @@ make run     # run the TUI in a container
 Each release's `checksums.txt` is signed with [cosign](https://github.com/sigstore/cosign) (keyless, via GitHub Actions) and every archive has an SBOM. To verify:
 
 ```sh
-cosign verify-blob checksums.txt \
-  --certificate checksums.txt.pem --signature checksums.txt.sig \
+cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
   --certificate-identity-regexp 'https://github.com/cloudssh-cli/cloudssh/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 sha256sum --check --ignore-missing checksums.txt

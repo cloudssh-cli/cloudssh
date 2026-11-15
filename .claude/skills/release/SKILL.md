@@ -18,5 +18,5 @@ Things that bit us before:
 - Tags are plain `vX.Y.Z` (`include-component-in-tag: false` in `release-please-config.json`). A component-prefixed tag such as `cloudssh-v0.1.0` is rejected by GoReleaser; if one appears, delete the release and tag and fix the config.
 - Hand-written release notes go in the Release PR body and its branch's `CHANGELOG.md`. Any later commit on `main` regenerates the PR and overwrites them, so merge nothing else in between.
 - `build(deps)`/`ci(deps)`/`chore` commits never open a Release PR; `fix(deps)` (Go module bumps) does.
-- After the release run: check the 4 archives, 4 SBOMs, `checksums.txt` + `.sig` + `.pem`, `Formula/cloudssh.rb` in `cloudssh-cli/homebrew-tap`, and `cosign verify-blob` on `checksums.txt` (certificate identity matches `github.com/cloudssh-cli/cloudssh`).
+- After the release run: check the 4 archives, 4 SBOMs, `checksums.txt` + `checksums.txt.sigstore.json`, `Formula/cloudssh.rb` in `cloudssh-cli/homebrew-tap`, and `cosign verify-blob` on `checksums.txt` (certificate identity matches `github.com/cloudssh-cli/cloudssh`).
 - Merging a PR that edits `.github/workflows/*` needs a token with the `workflow` scope (`gh auth refresh -s workflow`) or the GitHub web UI.
