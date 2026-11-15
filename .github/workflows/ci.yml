@@ -16,7 +16,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with: { go-version-file: go.mod }
       # golangci-lint is built from source with the repo's Go (same as the Dockerfile): the
@@ -34,7 +34,7 @@ jobs:
   vuln:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with: { go-version-file: go.mod }
       - id: tool
@@ -58,7 +58,7 @@ jobs:
     timeout-minutes: 15
     continue-on-error: ${{ matrix.os == 'macos-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with: { go-version-file: go.mod }
       - run: go test -race -count=1 ./...
@@ -75,7 +75,7 @@ jobs:
     env:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with: { go-version-file: go.mod }
       - uses: aws-actions/configure-aws-credentials@v4
