@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.1](https://github.com/cloudssh-cli/cloudssh/compare/v0.1.0...v0.1.1) (2026-11-15)
+
+A maintenance release: dependency updates, a tidier Homebrew tap and supply-chain hardening. There are no changes to cloudssh's features. Upgrade with `brew upgrade cloudssh`, or run the install script again.
+
+### Dependencies
+
+* AWS SDK for Go v2: `service/ec2` 1.341.0 → 1.345.0 and `config` 1.33.10 → 1.33.18
+* `charmbracelet/x/ansi` 0.11.6 → 0.11.9
+
+### Distribution
+
+* The Homebrew formula is now published under `Formula/` in [cloudssh-cli/homebrew-tap](https://github.com/cloudssh-cli/homebrew-tap)
+* README: the tap is live
+
+### Security and supply chain
+
+* CodeQL code scanning and OpenSSF Scorecard run on the repository; secret scanning with push protection and Dependabot security updates are enabled
+* GitHub Actions are pinned to commit SHAs, and the release workflow's token is read-only by default
+* Release archives keep their cosign-signed `checksums.txt` and per-archive SBOMs (see "Verify your download" in the README)
+
 ## [0.1.0](https://github.com/cloudssh-cli/cloudssh/releases/tag/v0.1.0) (2026-11-14)
 
 The first public release of **cloudssh**: a [k9s](https://k9scli.io)-style terminal UI for browsing your cloud resources and SSHing into them. AWS is supported today; the provider layer is cloud-agnostic, so other clouds can follow.
