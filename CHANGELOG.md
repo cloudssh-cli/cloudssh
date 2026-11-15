@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/cloudssh-cli/cloudssh/compare/v0.1.0...v0.1.1) (2026-11-15)
+
+
+### Docs
+
+* the Homebrew tap is live ([#34](https://github.com/cloudssh-cli/cloudssh/issues/34)) ([c41d9c5](https://github.com/cloudssh-cli/cloudssh/commit/c41d9c556e4bf71c0ff30ca7456c9b806d87c660))
+
 ## [0.1.0](https://github.com/cloudssh-cli/cloudssh/releases/tag/v0.1.0) (2026-11-14)
 
 The first public release of **cloudssh**: a [k9s](https://k9scli.io)-style terminal UI for browsing your cloud resources and SSHing into them. AWS is supported today; the provider layer is cloud-agnostic, so other clouds can follow.
