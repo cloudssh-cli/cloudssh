@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.1.2](https://github.com/cloudssh-cli/cloudssh/compare/v0.1.1...v0.1.2) (2026-11-15)
+
+A small release: a clearer way to make EC2 Instance Connect your default, plus dependency and CI updates. No breaking changes.
+
+### Configuration
+
+* **Make Instance Connect the default with `ssh_method: instance-connect`** (or `--ssh-method instance-connect`). The SSH dialog then opens with EC2 Instance Connect already selected, so you no longer pick it on every connect. Each cloud now names its own method, so other clouds will use their own word here. Typos are rejected with the valid choices. The previous value `temporary-key` keeps working, so existing configs need no change. ([#41](https://github.com/cloudssh-cli/cloudssh/pull/41))
+
+### Dependencies
+
+* AWS SDK: `service/autoscaling` 1.81.0 → 1.82.0, `service/ec2` 1.345.0 → 1.346.0. ([#39](https://github.com/cloudssh-cli/cloudssh/pull/39))
+
+### Build and CI
+
+* All CodeQL steps now run action v4 together, and Dependabot groups them so they always move in step ([#36](https://github.com/cloudssh-cli/cloudssh/pull/36)); `actions/setup-go` 5 → 7 and `sigstore/cosign-installer` 3 → 4 ([#38](https://github.com/cloudssh-cli/cloudssh/pull/38), [#32](https://github.com/cloudssh-cli/cloudssh/pull/32)).
+* End-to-end tests no longer depend on wall-clock timing, which removes the intermittent macOS CI failures ([#37](https://github.com/cloudssh-cli/cloudssh/pull/37)).
+
+### Upgrading
+
+`brew upgrade cloudssh`, or run the install script again.
+
 ## [0.1.1](https://github.com/cloudssh-cli/cloudssh/compare/v0.1.0...v0.1.1) (2026-11-15)
 
 A maintenance release: dependency updates, a tidier Homebrew tap and supply-chain hardening. There are no changes to cloudssh's features. Upgrade with `brew upgrade cloudssh`, or run the install script again.
