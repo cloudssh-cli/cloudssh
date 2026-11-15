@@ -1,11 +1,24 @@
 version: 2
 updates:
+  # Go modules ship in the binary, so their bumps are "fix(deps)": release-please then
+  # includes them in the next patch release (it ignores build/ci/chore commits).
   - package-ecosystem: gomod
     directory: /
     schedule: { interval: weekly }
+    commit-message: { prefix: "fix(deps)" }
+    groups:
+      aws-sdk:
+        patterns: ["github.com/aws/*"]
+      go-deps:
+        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    commit-message: { prefix: "ci(deps)" }
+    groups:
+      actions:
+        update-types: [minor, patch]
   - package-ecosystem: docker
     directory: /
     schedule: { interval: weekly }
+    commit-message: { prefix: "build(deps)" }
