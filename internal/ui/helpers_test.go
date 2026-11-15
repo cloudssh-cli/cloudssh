@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -151,8 +152,26 @@ func typeKeys(m Model, s string) Model {
 	return m
 }
 
-// run executes cmd, flattening batches. Sub-commands slower than a few ms
-// (the status-clear and splash ticks) are skipped.
+// TestMain swaps the real timers for deterministic ones: a timer due within
+// instantTimer fires at once, a longer one (status clear, splash, spinner) never
+// fires. run can then wait generously for real commands, such as spawning
+// ssh-keygen, instead of guessing which commands are timers by their speed.
+func TestMain(m *testing.M) {
+	tick = func(d time.Duration, fn func(time.Time) tea.Msg) tea.Cmd {
+		if d > instantTimer {
+			return func() tea.Msg { return nil }
+		}
+		return func() tea.Msg { return fn(time.Time{}) }
+	}
+	os.Exit(m.Run())
+}
+
+const (
+	instantTimer = 50 * time.Millisecond
+	cmdTimeout   = 10 * time.Second
+)
+
+// run executes cmd and flattens batches.
 func run(cmd tea.Cmd) []tea.Msg {
 	if cmd == nil {
 		return nil
@@ -169,7 +188,7 @@ func run(cmd tea.Cmd) []tea.Msg {
 			return out
 		}
 		return []tea.Msg{msg}
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(cmdTimeout):
 		return nil
 	}
 }
