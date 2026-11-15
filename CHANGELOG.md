@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.3](https://github.com/cloudssh-cli/cloudssh/compare/v0.1.2...v0.1.3) (2026-11-15)
+
+This release ships everything in 0.1.2 (below). The 0.1.2 tag was created but its release run failed while signing, so **0.1.2 has no downloads: use 0.1.3**.
+
+### Fixes
+
+* **Release signing:** the release pipeline signs `checksums.txt` as a single Sigstore bundle, `checksums.txt.sigstore.json` (cosign v3 format), instead of separate `.sig` and `.pem` files. To verify a download:
+
+  ```sh
+  cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
+    --certificate-identity-regexp 'https://github.com/cloudssh-cli/cloudssh/' \
+    --certificate-oidc-issuer https://token.actions.githubusercontent.com
+  ```
+
+  Releases up to 0.1.1 keep their `.sig` and `.pem` files. ([#43](https://github.com/cloudssh-cli/cloudssh/pull/43))
+
+### Upgrading
+
+`brew upgrade cloudssh`, or run the install script again.
+
 ## [0.1.2](https://github.com/cloudssh-cli/cloudssh/compare/v0.1.1...v0.1.2) (2026-11-15)
 
 A small release: a clearer way to make EC2 Instance Connect your default, plus dependency and CI updates. No breaking changes.
