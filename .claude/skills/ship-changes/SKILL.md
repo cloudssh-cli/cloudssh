@@ -3,7 +3,7 @@ name: ship-changes
 description: Commit cloudssh work as small Conventional Commits on a branch and open a pull request. Use whenever asked to commit/push, or after finishing a feature when asked to ship as you go. Never commits to main.
 ---
 
-Rules come from CLAUDE.md: small logical commits, Conventional Commits, **no Co-Authored-By trailer**, never push unless asked (the person you are working with may ask you to push).
+Rules come from CLAUDE.md: small logical commits, Conventional Commits, never push unless asked (the person you are working with may ask you to push).
 
 1. `make check` first (fmt, vet, lint, tests), then `make build` so `./bin/cloudssh` matches what you are about to commit (the Stop hook also does this). Also `docker compose run --rm dev go vet -tags integration ./...` after touching `internal/provider/aws` (that build tag is not covered by `make check`).
 2. Never commit on `main`. If you are on it, create a branch first (`git switch -c feat/<topic>`; prefixes `feat/ fix/ chore/ docs/`). The PR title must be a Conventional Commit: it becomes the squash commit and the changelog line.
