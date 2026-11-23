@@ -68,6 +68,25 @@ func TestArgsOnlyKeyAddsIdentitiesOnly(t *testing.T) {
 	}
 }
 
+func TestArgsWithoutUserEndOptionsBeforeAddress(t *testing.T) {
+	tests := []struct {
+		name string
+		t    Target
+		want []string
+	}{
+		{"plain address", Target{Address: "10.0.0.1"}, []string{"--", "10.0.0.1"}},
+		{"dash-prefixed address", Target{Address: "-oProxyCommand=x"}, []string{"--", "-oProxyCommand=x"}},
+		{"with key and port", Target{Address: "h", Port: 22, KeyFile: "/k"}, []string{"-p", "22", "-i", "/k", "--", "h"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.t.Args(); !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestNewTempKeyGeneratesAndCleansUp(t *testing.T) {
 	if _, err := exec.LookPath("ssh-keygen"); err != nil {
 		t.Skip("ssh-keygen not installed")
