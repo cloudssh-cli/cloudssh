@@ -55,7 +55,8 @@ func (t Target) args(keyFile string) []string {
 		}
 	}
 	if t.User == "" {
-		return append(args, t.Address) // ssh then uses its own default user
+		// "--" so an address starting with "-" is never parsed as an option; ssh then uses its own default user
+		return append(args, "--", t.Address)
 	}
 	return append(args, t.User+"@"+t.Address)
 }

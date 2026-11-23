@@ -119,7 +119,7 @@ func TestEnterResolvesHostThenSSHDialog(t *testing.T) {
 	if _, ok := m.modal.(*sshModal); !ok {
 		t.Fatalf("modal=%T", m.modal)
 	}
-	if !strings.Contains(m.View(), "ssh 10.0.0.1") {
+	if !strings.Contains(m.View(), "ssh -- 10.0.0.1") {
 		t.Fatalf("preview missing:\n%s", m.View())
 	}
 	// typing sets the user and the preview follows
