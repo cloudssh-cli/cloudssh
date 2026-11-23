@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssh-client 
 ARG GOLANGCI_LINT_VERSION=v2.15.0
 # built from source with the container's Go so it can typecheck current stdlib/deps
 RUN go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}
-RUN go install golang.org/x/vuln/cmd/govulncheck@latest
+RUN go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
 WORKDIR /src
 ENV GOFLAGS=-buildvcs=false
 
